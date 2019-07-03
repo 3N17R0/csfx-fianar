@@ -1,0 +1,34 @@
+﻿
+/*BaseColor*/
+if (!window.WS) window.WS = {};
+if (!window.WS.Util) window.WS.Util = {};
+if (!window.WS.Util.Color) window.WS.Util.Color = {};
+
+window.WS.Util.Color.HexaToRgba = function (Color)
+{
+    // Validation
+    if (!Color) throw "Color cannot be null.";
+    if (!Color.Value && (Color.Value.replace("#", "").length != 3 || Color.Value.replace("#", "").length != 6)) throw "Color value cannot be null or invalid type.";
+
+    var CodeCode = Color.Value.replace("#", "");
+    CodeCode = CodeCode.match(new RegExp('(.{' + CodeCode.length / 3 + '})', 'g'));
+
+    for (var i = 0; i < CodeCode.length; i++) { CodeCode[i] = parseInt(CodeCode[i].length == 1 ? CodeCode[i] + CodeCode[i] : CodeCode[i], 16); }
+    if (typeof Color.Opacity != 'undefined') CodeCode.push(Color.Opacity);
+
+
+    return "rgba(" + CodeCode.join(',') + ")";
+};
+
+window.WS.Util.Color.GetLinearGradient = function (Color)
+{
+    // Validation
+    if (!Color) throw "Color cannot be null.";
+    if ((!Color.Angle && Color.Angle !== 0) || typeof Color.Angle !== "number") throw "Color angle invalid type (expected number)";
+
+    var Colors = "";
+    var ColorLen = Color.Colors.length;
+    for (var i = 0; i < ColorLen; i++) { Colors += WS.Util.Color.HexaToRgba(Color.Colors[i]) + (i < Color.Colors.length - 1 ? "," : ""); }
+
+    return "linear-gradient(" + Color.Angle + "deg," + Colors + ")";
+};

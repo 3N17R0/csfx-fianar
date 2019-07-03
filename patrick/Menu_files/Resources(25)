@@ -1,0 +1,157 @@
+﻿
+WS.Namespace.Create('NovAxis.RadioButton', (function ()
+{
+    /**
+    @class RadioButton
+    @namespace NovAxis
+    @constructor
+    @param {JQuery dom} Element Dom element that will be replaced by the control. <br />
+    Must be in the specific form : &lt;input type="radio" value="myvalue"&gt;&lt;label&gt;Mon texte&lt;/label&gt;<br />
+    Property checked intag is supported : &lt;input type="radio" value="myvalue" <span style="background-color:yellow;">checked</span>&gt;&lt;label&gt;Mon texte&lt;/label&gt;
+    @param {String} [Value] the value for selected item.
+    @param {Integer} [Orientation] The orientation of the control. (0=horizontal, 1=vertical) Default : 0
+    @param {Array<String>} [Classes] Array of class names to apply to the control.
+    @param {Boolean} [Nullable] Whether or not the control can have no value.
+    **/
+    var Class = function (Element, Value, Orientation, Classes, Nullable)
+    {
+        // Validation
+        if (!Element || Element.length == 0) throw "Element control cannot be null.";
+
+        /**
+        Fired when the value is changed.
+
+        @event change
+        @param {Number} The new value.
+        **/
+        WS.EventObject.call(this, ['change']);
+
+        // InitData
+        this._Value = null;
+        this.originalElement = Element;
+
+        // Element
+        this._Element = $(CreateControl.call(this, Element));
+        this._Nullable = Nullable || false;
+
+        // Orientation
+        if (Orientation != null && Orientation == 1) this._Element.find(".naRadioButtonOption:not(:first-child)").css({ "display": "block", "margin": "5px 0px 0px 0px" });
+
+        Element.after(this._Element);
+        Element.remove();
+        if (Classes && Classes.length > 0) this._Element.addClass(Classes.join(" "));
+
+        // Events, Bindings
+        AddEvents.apply(this);
+        if (Value != null || Nullable) this.SetValue(Value);
+    };
+
+    WS.Exts.Inherits(Class, WS.EventObject);
+
+    // Private Method(s)
+    var CreateControl = function (Element)
+    {
+        var Me = this;
+
+        var Html = [];
+        Html.push("<div class=\"naRadioButton\">");
+        var ElementChecked = false;
+        Element.find("input[type=radio]").each(function ()
+        {
+            var MyElement = $(this);
+            var Checked = "";
+            if (MyElement.is("[checked]") && !ElementChecked)
+            {
+                Checked = " wsChecked";
+                ElementChecked = true;
+                Me._Value = MyElement.val();
+            }
+            Html.push("<div class=\"naRadioButtonOption\">");
+            Html.push("<div class=\"naRadioButtonItem" + Checked + "\" data=\"" + MyElement.val() + "\"></div>");
+            Html.push("<label>" + MyElement.next("label").text() + "</label>");
+            Html.push("</div>");
+        });
+        Html.push("</div>")
+
+        return Html.join("");
+    };
+
+    var AddEvents = function ()
+    {
+        var Me = this;
+
+        var Elements = this._Element.find(".naRadioButtonOption > div");
+        var Labels = this._Element.find(".naRadioButtonOption > label");
+
+        Elements.off("click");
+        Elements.on("click", function ()
+        {
+            var Value = $(this).attr("data");
+            if (Me.GetValue() != Value)
+            {
+                Me.SetValue(Value);
+                Me.RaiseEvent("change", Value);
+            }
+        });
+
+        Labels.off("click");
+        Labels.on("click", function ()
+        {
+            $(this).prev("div").click();
+        })
+    };
+
+    // Public Method(s)
+    (function (Methods)
+    {
+        /**
+        Get the selected value.
+    
+        @method GetValue
+        @return {String} Value
+        **/
+        Methods.GetValue = function ()
+        {
+            return this._Value;
+        };
+
+        /**
+        Set the selected value.
+    
+        @method SetValue
+        @param {String} Value
+        **/
+        Methods.SetValue = function (Value)
+        {
+            // Validation
+            if (Value == null && !this._Nullable) throw "Value cannot be null.";
+
+            this._Value = Value;
+            var Elements = this._Element.find(".naRadioButtonOption > div");
+            var Element = null;
+            if (Value != null)
+            {
+                Element = this._Element.find(".naRadioButtonOption > div[data=" + Value + "]");
+                if (Element.length == 0) throw "Invalid value.";
+            }
+
+            Elements.removeClass("wsChecked");
+            if (Element) Element.addClass("wsChecked");
+        };
+
+        /**
+        Destroy the control.
+   
+        @method Destroy
+        **/
+        Methods.Destroy = function ()
+        {
+            this._Element.after(this.originalElement);
+            this._Element.remove();
+            this._Element = null;
+        };
+
+    })(Class.prototype);
+
+    return Class;
+})());

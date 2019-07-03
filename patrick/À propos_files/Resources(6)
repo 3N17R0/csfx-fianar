@@ -1,0 +1,208 @@
+﻿
+WS.Namespace.Create("WS.Editor.Menu", (function ()
+{
+    var instance = null;
+
+    var _class = function (element)
+    {
+        if (instance) throw "Cannot create more than one instance of menu.";
+
+        instance = this;
+
+        this._element = element;
+        this._wrapper = element.parent();
+        this._tabsHolder = element.children();
+    };
+
+    _class.GetInstance = function ()
+    {
+        return instance;
+    };
+
+    // Private Method(s)
+    var GetTabsWidth = function ()
+    {
+        var width = 0;
+
+        var firstLevelItems = this._element.find(".item, .separator");
+        for (var i = 0; i < firstLevelItems.length; i++)
+        {
+            width += firstLevelItems.eq(i).outerWidth(true);
+        }
+
+        return width;
+    };
+
+    var SetTabsWidth = function (separatorWidth)
+    {
+        var items = this._element.find(".item");
+        var menuWidth = this._element.width();
+        items.css("width", "");
+
+        if (menuData.scaleTabs)
+        {
+            var largestTab = 0;
+            for (var i = 0; i < items.length; i++)
+            {
+                largestTab = Math.max(largestTab, items.eq(i).outerWidth());
+            }
+
+            if (menuData.justifyTabs)
+            {
+                // equal tabs filling menu (menuWidth - separators&tabSpacings / nbTabs)
+                items.css("width", largestTab); 
+                var totalWidth = GetTabsWidth.call(this);
+                if (totalWidth < menuWidth) 
+                {
+                    items.css("width", "+=" + Math.floor((menuWidth - totalWidth) / items.length)); //fix for firefox (Math.floor)
+                }
+            }
+            else //not justify
+            {
+                                       
+                items.css("width", largestTab);
+            }
+        }
+        else if (menuData.justifyTabs)
+        {
+            // original ratio filling menu
+            var tabsTotalWidth = 0;
+            for (var i = 0; i < items.length; i++)
+            {
+                tabsTotalWidth += items.eq(i).outerWidth();
+            }
+
+            var freeSpace = menuWidth - (menuData.tabFxName === "Separator" ? ((items.length - 1) * 2 * menuData.tabSpacing) + (items.length - 1) * separatorWidth : (items.length - 1) * menuData.tabSpacing);
+            for (var i = 0; i < items.length; i++)
+            {
+                if (freeSpace > tabsTotalWidth) $(this).css("width", Math.floor(freeSpace * items.eq(i).outerWidth() / tabsTotalWidth));
+            }
+        }
+    };
+
+    var OnMenuItemMouseEnter = function () {
+        var subMenuItem = $(this).find('.subMenu').first();
+        if (subMenuItem.length < 1) return;
+
+        var initialLeft = parseInt(subMenuItem.data('initialLeft'));
+        if (!isNaN(initialLeft)) {
+            subMenuItem.css({ left: initialLeft });
+        }
+
+        var mainWrapperWidth = $('#MainWrapper').width();
+        var offset = subMenuItem.offset();
+        var width = subMenuItem.width();
+        var currentLeft = parseInt(subMenuItem.position().left) || 0;
+
+        var newOffsetLeft = Math.min(Math.max(offset.left + width, 0), mainWrapperWidth);
+        var newPositionLeft = (newOffsetLeft - newOffsetLeft) + currentLeft;
+
+        subMenuItem.css({ left: newPositionLeft });
+    };
+
+    var OnSubItemMouseEnter = function () {
+        var subSubMenu = $(this).find('> .subSubMenu').first();
+        if (subSubMenu.length < 1) return;
+
+        subSubMenu.removeClass('subMenuLeft');
+
+        var mainWrapperWidth = $('#MainWrapper').width();
+        var offset = subSubMenu.offset();
+        var width = subSubMenu.width();
+
+        subSubMenu.toggleClass('subMenuLeft', offset.left + width > mainWrapperWidth);
+    };
+
+    // Public Method(s)
+    (function (methods)
+    {
+        methods.Bind = function ()
+        {
+            var menuWidth = this._element.width();
+
+            var Items = this._element.find(".item");
+
+            Items.off('mouseenter', OnMenuItemMouseEnter).on('mouseenter', OnMenuItemMouseEnter);
+
+            // Add separators if applicable
+            var separatorWidth = 0;
+            if (menuData.tabFxName === "Separator") separatorWidth = $(document.createElement("div")).addClass("separator").insertBefore(this._element.find(".item + .item")).width();
+
+            // Adjust tabs width according to the parameters
+            SetTabsWidth.call(this, separatorWidth);
+
+            // If tabs (+ separators) require extra space
+            if (GetTabsWidth.call(this) > menuWidth)
+            {
+                // Add "More" tab and a separator if applicable
+                var more = $(document.createElement("div")).addClass("item").attr("id", "More").append($(document.createElement("a")).attr("name", menuData.moreTabText).text(menuData.moreTabText)).append($(document.createElement("div")).addClass("subMenu")).appendTo(this._tabsHolder);
+                if (separatorWidth) more.before($(document.createElement("div")).addClass("separator"));
+
+                SetTabsWidth.call(this, separatorWidth);
+
+                // Move last tab (and remove preceding separator) in the "More" sub menu while tabs require more space
+                while (GetTabsWidth.call(this) > menuWidth && this._element.find(".item").length > 1)
+                {
+                    this._element.find(".item:eq(-2)").prependTo(more.find(".subMenu:first")).removeClass("item").addClass("subItem").css("width", "").find(".subMenu").removeClass("subMenu").addClass("subSubMenu");
+                    this._element.find(".separator + .separator").remove();
+                    if (this._element.find(".item").length == 1) this._element.find(".separator").remove();
+
+                    SetTabsWidth.call(this, separatorWidth);
+                }
+            }
+            var subItem = this._element.find('.subItem');
+            subItem.off('mouseenter', OnSubItemMouseEnter).on('mouseenter', OnSubItemMouseEnter);
+
+            if (menuData.justifyTabs) this._tabsHolder.css("margin-left", 0);
+            else this._tabsHolder.css("margin-left", (this._element.width() - this._tabsHolder.width()) * menuData.tabsPosition / 100);
+
+            this.ReassignActivePage();
+
+            // Centering sub menu
+            if (menuData.subTabsPosition == 50)
+            {
+                var _submenu = this._element.find(".subMenu");
+                if (_submenu.length > 0)
+                {
+                    var _submenuLen = _submenu.length;
+                    for (var i = 0; i < _submenuLen; i++)
+                    {
+                        var _currentItem = _submenu.eq(i);
+                        var _submenuParent = _currentItem.parent();
+                        var _parentWidth = _submenuParent.width();
+                        var _submenuWidth = _currentItem.width();
+                        var _marginLeft = 0;
+                        if (_parentWidth > _submenuWidth) _marginLeft = ((_parentWidth - _submenuWidth) / 2);
+                        else _marginLeft = -((_submenuWidth - _parentWidth) / 2);
+
+                        _currentItem.data("initialLeft", _marginLeft);
+                        _currentItem.css("left", _marginLeft);
+                    }
+                }
+            }
+
+            var tabsHolderHeight = this._element.height() / 2 - this._tabsHolder.height() / 2;
+            this._tabsHolder.css('margin-top', tabsHolderHeight + "px");
+        };
+
+        methods.ReassignActivePage = function () {
+
+            var hash = window.location.hash;
+            var activeMenuItem = this._element.find("a").filter(function () {
+                var dataId = Number($(this).attr('data-id'));
+                var isActiveItem = dataId == pageData.pageId;
+                if (isActiveItem) {
+                    var anchor = $(this).attr('data-anchor') || "";
+                    isActiveItem = (anchor.length == 0 && hash.length == 0) || (anchor == hash);
+                }
+
+                return isActiveItem;
+            });
+            this._element.find("div.active").removeClass("active");
+            activeMenuItem.parent().addClass("active");
+        };
+
+    })(_class.prototype);
+
+    return _class;
+})());

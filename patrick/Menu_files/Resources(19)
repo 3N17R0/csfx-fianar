@@ -1,0 +1,51 @@
+﻿.wsCaptionManager 
+{
+    position: absolute;
+    font-family: 'Signika', sans-serif;
+    background-color: rgba(0,0,0,0.7);
+    padding: 5px;
+    overflow: auto;
+    color: #fff;
+    visibility: hidden;
+    opacity: 0.0;
+    -webkit-transition: visibility .5s, opacity .5s;
+    transition: visibility .5s, opacity .5s;
+    box-sizing: border-box;
+}
+
+.wsCaptionManager.wsActive
+{
+    visibility: visible;
+    opacity: 1.0;
+    -webkit-transition: visibility 1s, opacity 1s;
+    transition: visibility 1s, opacity 1s;
+}
+
+.wsCaptionManager > div.wsLeft
+{
+    text-align: left;
+}
+
+.wsCaptionManager > div.wsCenter
+{
+    text-align: center;
+}
+
+.wsCaptionManager > div.wsRight
+{
+    text-align: right;
+}
+
+.wsCaptionManager > div > span
+{
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+}
+
+.wsCaptionManager > div > span:nth-child(1)
+{
+    font-size: 120%;
+}

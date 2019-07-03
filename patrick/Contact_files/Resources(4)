@@ -1,0 +1,370 @@
+
+/* Base */
+if (!window.WS) window.WS = {};
+if (!WS.Namespace)
+{
+    WS.Namespace = {
+        Create: function (name, value)
+        {
+            var root = window;
+            var parts = name.split(".");
+            var i = 0;
+            for (i = 0; i < parts.length - 1; i++)
+            {
+                if (!root[parts[i]]) root[parts[i]] = {};
+                root = root[parts[i]];
+            }
+
+            if (!root[parts[i]]) root[parts[i]] = value;
+        }
+    };
+}
+
+/**
+@class EventObject
+@namespace WS
+@constructor 
+@param {Array} Events 
+**/
+WS.Namespace.Create("WS.EventObject", (function ()
+{
+    // Constructor(s)
+    var _class = function (events)
+    {
+        if (!(events instanceof Array)) throw "Invalid parameter : events must be an array.";
+        this.events = events;
+        this.handlers = [];
+        for (var i = 0; i < events.length; i++) this.handlers.push([]);
+    };
+
+    // Public Methods
+    (function (methods)
+    {
+        /**
+        RegisterEvent, let you listen to an event and attach handler to it.
+        
+        @method RegisterEvent
+        @param {String} Name
+        @param {Function} Handler
+        @param {Object} Context
+        **/
+        methods.RegisterEvent = function (name, handler, context)
+        {
+            if (!name) return;
+            if (!handler) return;
+
+            name = name.toLowerCase();
+            context = context || window;
+
+            var idx = this.events.indexOf(name);
+            if (idx != -1) this.handlers[idx].push({ handler: handler, context: context });
+        };
+
+        /**
+        UnregisterEvent, let you cancel an event listener.
+        
+        @method UnregisterEvent
+        @param {String} Name
+        @param {Function} [Handler]
+        @param {Object} [Context]
+        **/
+        methods.UnregisterEvent = function (name, handler, context)
+        {
+            if (!name) return;
+
+            name = name.toLowerCase();
+            context = context || window;
+
+            var idx = this.events.indexOf(name);
+            if (idx != -1)
+            {
+                if (handler)
+                {
+                    for (var i = 0; i < this.handlers[idx].length; i++)
+                    {
+                        if (this.handlers[idx][i].handler === handler && this.handlers[idx][i].context === context)
+                        {
+                            this.handlers[idx].splice(i, 1);
+                            i = this.handlers[idx].length;
+                        }
+                    }
+                }
+
+                else
+                {
+                    this.handlers[idx].splice(0, this.handlers[idx].length);
+                }
+            }
+        };
+
+        /**
+        Raise an Event, can be catched when RegisterEvent is implemented.
+
+        @method RaiseEvent
+        @param {String} Name
+        @param {Object} [Arguments]
+        **/
+        methods.RaiseEvent = function (name)
+        {
+            var idx = this.events.indexOf(name);
+            var args = Array.prototype.slice.call(arguments, 0);
+            args.splice(0, 1);
+            var result = [];
+            if (idx != -1) { for (var i = 0; i < this.handlers[idx].length; i++) result.push(this.handlers[idx][i].handler.apply(this.handlers[idx][i].context, args)); }
+            return result;
+        };
+
+        /**
+        Add a new event type.
+
+        @method AddEvent
+        @param {String} Name
+        **/
+        methods.AddEvent = function (name)
+        {
+            if (!name) return;
+
+            name = name.toLowerCase();
+
+            var idx = this.events.indexOf(name);
+            if (idx == -1)
+            {
+                this.events.push(name);
+                this.handlers.push([]);
+            }
+        };
+    })(_class.prototype);
+
+
+    return _class;
+})());
+
+/**
+@class Exts
+@namespace WS
+@static
+**/
+WS.Namespace.Create("WS.Exts", {
+
+    /**
+    Method Bindings
+
+    @method BindMethod
+    @param {Function} Method Func Ref.
+    @param {Object} Context Element (this)
+    **/
+    BindMethod: function (method, context)
+    {
+        return function () { method.apply(context, arguments); };
+    },
+
+    /**
+    Inherits from Class
+
+    @method Inherits
+    @param {Object} Child Object to Bind Inherits
+    @param {Object} Base Object from which Child Inherits
+    **/
+    Inherits: function (child, base)
+    {
+        child.prototype = Object.create(base.prototype);
+    },
+
+    /**
+    Create Class
+
+    @method CreateClass
+    @param {Function} Constructor
+    @param {Object List(String,Function)} [Methods] ListOf MethodName With theirs Function
+    @param {Function} [BaseClass]
+    **/
+    CreateClass: function (constructor, methods, baseClass)
+    {
+        if (!(typeof constructor === 'function')) throw "Parameter 'constructor' must be a function.";
+
+        var _class = constructor;
+        if (typeof baseClass === 'function') WS.Exts.Inherits(_class, baseClass);
+
+        if (typeof methods === 'object')
+        {
+            for (var name in methods)
+            {
+                if (methods[name] instanceof Function) _class.prototype[name] = methods[name];
+            }
+        }
+
+        return _class;
+    }
+});
+
+//--------
+// String
+//--------
+/**
+Check if string starts with input string
+
+@method startsWith
+@param {String} Input 
+ **/
+String.prototype.startsWith = function (str)
+{
+    return (this.match("^" + str) == str)
+}
+
+/**
+Check if string ends with input string
+
+@method endsWith
+@param {String} Input 
+ **/
+String.prototype.endsWith = function (str)
+{
+    return (this.match(str + "$") == str)
+}
+
+/**
+Check if string contains input string
+
+@method contains
+@param {String} Input 
+ **/
+String.prototype.contains = function (str)
+{
+    return this.indexOf(str) != -1;
+};
+
+/**
+@method getKeyValue
+@param {String} Splitter 
+ **/
+String.prototype.getKeyValue = function (splitter)
+{
+    var Params = {};
+    try
+    {
+        this.split(splitter).forEach(function (item)
+        {
+            var items = item.split("=");
+            var length = items.length;
+            var Values = "";
+            for (var i = 1; i <= length - 1 ; i++)
+            {
+                if (Values) Values += "=";
+                Values += items[i];
+            }
+
+            Params[item.split("=")[0].trim()] = Values;
+        });
+    }
+    catch (ex) { Params = null; }
+
+
+    return Params;
+}
+
+String.prototype.EscapeQuotes = function () {
+    return this.replace(/[\\"']/g, '\\$&');
+};
+
+//--------
+// Array
+//--------
+
+/**
+Swap elements from Source and Destination
+
+@method swapItems
+@param {Integer} SourceIndex
+@param {Integer} DestinationIndex
+ **/
+Array.prototype.swapItems = function (a, b)
+{
+    this[a] = this.splice(b, 1, this[a])[0];
+
+
+    return this;
+}
+
+/**
+Remove item from array
+
+@method contains
+@param {Object} Content 
+ **/
+Array.prototype.remove = function (content)
+{
+    var Idx = this.indexOf(content);
+    if (Idx != -1) this.splice(Idx, 1);
+};
+
+/**
+Check if Array contains Object
+
+@method contains
+@param {Object} Content 
+ **/
+Array.prototype.contains = function (content)
+{
+    return this.indexOf(content) != -1;
+};
+
+/**
+Move item from source to destination and ajust
+all others items to correct index
+
+@method moveItem
+@param {Integer} SourceIndex
+@param {Integer} DestinationIndex
+ **/
+Array.prototype.moveItem = function (a, b)
+{
+    var current = this[a];
+    this.splice(a, 1);
+    return this.splice(b, 0, current);
+}
+
+//----------
+// Number
+//----------
+Number.round = function (value, nbdecimals) {
+    if (value === undefined) throw "value cannot be null";
+    if (typeof value !== "number" && typeof value !== "string") throw "value must string or a numeric";
+    if (nbdecimals == null || typeof nbdecimals !== "number") throw "nbdecimals cannot be null";
+
+    if (typeof value == "string") { value = value.replace(",", "."); }
+    value = parseFloat(value).toFixed(nbdecimals);
+
+    return Number((Math.round(value + "e" + nbdecimals) + "e-" + nbdecimals));
+}
+
+var GetQueryString = function (location) {
+    var Params = {};
+    try {
+        location.search.substr(1).split("&").forEach(function (item) { Params[item.split("=")[0]] = item.split("=")[1] });
+    }
+    catch (ex) { }
+
+
+    return Params;
+};
+
+var ScrollToElement = function (element) {
+
+    if (element.length == 0) return;
+
+    var newScrollY = element.offset().top;
+
+    if (WS.IsMobile) {
+        if ($("#Menu").css('position') == 'fixed') newScrollY -= $(".wsMobileTopBar").height();
+    }
+    else {
+        var menu = WS.Editor.Menu.GetInstance();
+        if (menu) menu.ReassignActivePage();
+        if ($("#HeaderWrapper").css('position') == 'fixed') newScrollY -= $("#HeaderWrapper").height();
+    }
+
+    $("html,body").velocity('scroll', {
+        duration: 500,
+        offset: newScrollY
+    });
+};

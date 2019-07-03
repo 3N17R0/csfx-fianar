@@ -1,0 +1,93 @@
+﻿.sb-scroll,
+[sb-scroll],
+[data-sb-scroll] {
+    overflow: auto;
+    outline: none;
+}
+
+.sb-i {
+    overflow-y: hidden;
+}
+
+.sb-scroll.sb-scroll-ie,
+.sb-scroll.sb-scroll-ie.sb-i {
+    overflow-y: auto;
+}
+
+.sb-scroll.sb-rel {
+    position: relative;
+}
+
+.sb-scroll .sb-handle,
+.sb-scrollbar {
+    position: absolute;
+    top: 0;
+    border-radius: 8px;
+}
+
+.sb-scroll .sb-scrollbar {
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -o-user-select: none;
+    user-select: none;
+    box-sizing: border-box;
+    right: 0;
+    width: 16px;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.sb-scroll .sb-handle {
+    height: 10%;
+    min-height: 32px;
+    width: 100%;
+    padding: 8px 0;
+    box-sizing: border-box;
+}
+
+.sb-scroll .sb-handle::before {
+    content: '';
+    display: block;
+    position: relative;
+    margin-left: 25%;
+    width: 50%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    transition-duration: 0.2s;
+    transition-property: background-color, height;
+}
+
+.sb-scroll .sb-scrollbar.sb-full {
+    display: none;
+}
+
+.sb-scroll:hover > .sb-scrollbar,
+.sb-scroll.sb-active > .sb-scrollbar {
+    opacity: 1;
+}
+
+.sb-scroll .sb-handle:hover::before,
+.sb-scroll.sb-active .sb-handle::before,
+.sb-scroll.sb-active .sb-handle:hover::before{
+    background-color: rgba(0, 165, 165, 1);
+}
+
+/*===========================================*/
+/*               Overrides                   */
+/*===========================================*/
+
+/* Mouse Over */
+.sb-scroll .sb-handle:hover::before {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Active (Dragging) */
+.sb-scroll.sb-active .sb-handle::before,
+.sb-scroll.sb-active .sb-handle:hover::before{
+    background-color: [main-1-background-color];
+}

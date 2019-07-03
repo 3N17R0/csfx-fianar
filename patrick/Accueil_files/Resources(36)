@@ -1,0 +1,59 @@
+﻿
+.Block.Type_Button .Block_Wrapper
+{
+    overflow: visible;
+}
+
+.wsCtButton
+{
+    height: 100%;
+}
+
+.wsCtButtonMain
+{
+    height: 100%;
+    overflow: visible;
+}
+
+.wsCtButtonMain:hover
+{
+    opacity: 0.85;
+}
+
+.wsCtButtonMain .wsText
+{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    padding: 0 10px;
+}
+
+.wsCtButtonMain .wsText > *
+{
+    flex: 1;
+}
+
+.wsCtButton .Circulaire
+{
+    border-radius: 100px;
+}
+
+.wsCtButton .RoundedCorner
+{
+    border-radius: 5px;
+}
+
+.wsCtButton .wsCover
+{
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}

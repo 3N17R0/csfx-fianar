@@ -1,0 +1,37 @@
+﻿
+.naRadioButton,
+.naRadioButton .naRadioButtonOption,
+.naRadioButton .naRadioButtonItem
+{
+    display: inline-block;
+}
+
+.naRadioButton .naRadioButtonOption:not(:first-child)
+{
+    margin-left: 20px;
+}
+
+.naRadioButton .naRadioButtonOption > label
+{
+    margin-left: 10px;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.naRadioButton .naRadioButtonItem
+{
+    width: 13px;
+    height: 13px;
+    background-color: [neutral-2-background-color];
+    border-radius: 7px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.naRadioButton .naRadioButtonItem.wsChecked
+{
+    background-image: url("/file/app/1/editor/icon/radio.svg?color1=r19g173b183");
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: 60%;
+}

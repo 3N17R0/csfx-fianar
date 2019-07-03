@@ -1,0 +1,698 @@
+﻿/**
+Base uploader class. Should not be instantiated.
+
+@class Uploader
+@namespace WS.Uploader
+@constructor
+@param {jQuery Object} buttonElements Elements that open the browse for files window when clicked.
+@param {jQuery Object} [listElement=null] Element that will contain upload preview. If multiple elements are sent, only the first one will be used. Ignored if listingTemplate is null.
+@param {Object} params An object containing upload parameters.
+@param {String} params.url The upload url.
+@param {Boolean} [params.keeporiginal=true] Set whether or not to keep the original file. Ignored when no modifications are applied to the uploaded files.
+@param {Boolean} [params.wantresize=false] Set whether or not to resize the file. Ignored if the file is not an image.
+@param {String} [params.resizeformat=null] Set the format to which the image should be resized. If empty and params.wantresize is set to true, the format will be the same as the original file.
+@param {Integer} [params.resizewidth=null] Set the resize width. If empty and params.wantresize is set to true and params.resizewidth is not set, params.resizeheight must be set.
+@param {Integer} [params.resizeheight=null] Set the resize height. If empty and params.wantresize is set to true and params.resizeheight is not set, params.resizewidth must be set.
+@param {Boolean} [params.wantmipmapping=false] Set whether or not to create smaller copies of the file. Ignored if the file is not an image.
+@param {Object} [options=null] An object containing uploader settings.
+@param {Array} [options.mimes=["*"]] Accepted MIME types.
+@param {Boolean} [options.multiple=false] Set whether or not to accept multiple files selection.
+@param {Boolean} [options.autostart=true] Set whether or not to automatically start uploading when a file is selected.
+@param {Boolean} [options.autoclear=false] Set whether or not to automatically remove completed uploads preview. Ignored if listElement or listingTemplate is null.
+@param {jQuery Object} dropElements Elements that accept files dropped from a directory.
+@param {jQuery Object} listingTemplate Element that will be used as a template for upload preview.
+@param {jQuery Object} globalProgressElements Elements that will be used to show upload progression.
+**/
+WS.Namespace.Create("WS.Uploader.Uploader", (function ()
+{
+    var URL = window.URL || window.webkitURL;
+    var Support = {
+        File: (window.File !== undefined),
+        FormData: (window.FormData !== undefined),
+        BlobUrl: (URL !== undefined && URL.createObjectURL !== undefined),
+        BlobUrlDispose: (URL !== undefined && URL.revokeObjectURL !== undefined)
+    };
+
+    var SizeUnits = ["B", "KB", "MB", "GB", "TB", "PB"];
+    var FormatSize = function (byteCount, forcedUnit, precision)
+    {
+        precision = precision || 0;
+        if (precision < 0) precision = 0;
+        var unitIndex = 0;
+        while ((byteCount > 1024 && unitIndex < SizeUnits.length - 1) || (SizeUnits.indexOf(forcedUnit) != -1 && SizeUnits[unitIndex] != forcedUnit))
+        {
+            byteCount = byteCount / 1024;
+            unitIndex++;
+        }
+
+        return { value: parseFloat(byteCount.toFixed(precision)), unit: SizeUnits[unitIndex] };
+    };
+
+    var OnUploadCancel = function ()
+    {
+        if (!this.cancelled)
+        {
+            this.cancelled = true;
+            if (this.xhr)
+            {
+                this.xhr.abort();
+            }
+
+            else
+            {
+                if (this.hasElement) this.element.cancel.hide();
+                this.completed = true;
+                if (this.autoclear) this.Dispose();
+                this.RaiseEvent("cancel", this.file.size, this.loaded);
+                this.RaiseEvent("complete", null);
+            }
+        }
+    };
+
+    var Upload = function (container, template, file, autoclear)
+    {
+        WS.EventObject.call(this, ["start", "progress", "complete", "cancel"]);
+
+        this.file = file;
+        this.autoclear = autoclear;
+        this.blobUrl = null;
+        this.success = false;
+        this.loadEndSupport = true;
+        this.fileSize = FormatSize(file.size, null, 2);
+        this.loaded = 0;
+        this.xhr = null;
+        this.started = false;
+        this.cancelled = false;
+        this.completed = false;
+        this.disposed = false;
+
+        this.element = null;
+        this.hasElement = (container && template ? true : false);
+        if (this.hasElement)
+        {
+            this.element = {};
+            this.element.main = template.clone();
+            this.element.preview = this.element.main.find("[data=preview]");
+            this.element.name = this.element.main.find("[data=name]");
+            this.element.size = this.element.main.find("[data=size]");
+            this.element.unit = this.element.main.find("[data=unit]");
+            this.element.progress = {};
+            this.element.progress.main = this.element.main.find("[data=progress]");
+            this.element.progress.bar = this.element.main.find("[data=progress-bar]");
+            this.element.progress.percentage = this.element.main.find("[data=progress-percentage]");
+            this.element.progress.size = this.element.main.find("[data=progress-size]");
+            this.element.progress.unit = this.element.main.find("[data=progress-unit]");
+            this.element.cancel = this.element.main.find("[action=cancel]");
+            this.element.loading = {};
+            this.element.loading.overlay = this.element.main.find("[data=loadingoverlay]");
+            this.element.loading.indicator = this.element.main.find("[data=loading]");
+            if (this.element.loading.indicator.length == 0)
+            {
+                if (this.element.loading.overlay.length > 0)
+                {
+                    this.element.loading.overlay.append('<div class="wsLoadingFlexContainer"><div class="wsLoadingSpinner" style="font-size: 5;"></div></div>');
+                    this.element.loading.overlay.filter("[size=small]").find(".wsLoadingSpinner").css({ fontSize: "2" });
+                    this.element.loading.overlay.filter("[size=large]").find(".wsLoadingSpinner").css({ fontSize: "9" });
+                }
+            }
+
+            else
+            {
+                this.element.loading.indicator.append('<div class="wsLoadingFlexContainer"><div class="wsLoadingSpinner" style="font-size: 5;"></div></div>');
+                this.element.loading.indicator.filter("[size=small]").find(".wsLoadingSpinner").css({ fontSize: "2" });
+                this.element.loading.indicator.filter("[size=large]").find(".wsLoadingSpinner").css({ fontSize: "9" });
+            }
+
+            this.element.main.removeAttr("data").removeAttr("action");
+            this.element.main.find("[data],[action]").removeAttr("data").removeAttr("action");
+            this.element.loading.overlay.removeAttr("size");
+            this.element.loading.indicator.removeAttr("size");
+
+            this.element.name.html(this.file.name);
+            this.element.name.attr("title", this.file.name);
+            this.element.size.html(this.fileSize.value);
+            this.element.unit.html(this.fileSize.unit);
+            this.element.progress.main.hide();
+            this.element.progress.bar.css("width", "0%");
+            this.element.progress.percentage.html("0");
+            this.element.progress.size.html("0");
+            this.element.progress.unit.html(this.fileSize.unit);
+            this.element.loading.overlay.hide();
+            if (this.element.cancel.length > 0) this.element.cancel.one("click", WS.Exts.BindMethod(OnUploadCancel, this));
+
+            container.append(this.element.main);
+        }
+    };
+
+    WS.Exts.Inherits(Upload, WS.EventObject);
+
+    (function (methods)
+    {
+        var OnProgress = function (event)
+        {
+            if (event.lengthComputable)
+            {
+                var percentage = parseFloat((event.loaded / event.total * 100).toFixed(2));
+                var loaded = event.loaded;
+                if (loaded > this.file.size) loaded = this.file.size;
+
+                if (this.hasElement)
+                {
+                    this.element.progress.bar.css("width", percentage + "%");
+                    this.element.progress.percentage.html(percentage);
+                    this.element.progress.size.html(FormatSize(loaded, this.fileSize.unit, 2).value);
+                    if (loaded == this.file.size) this.element.loading.overlay.show();
+                }
+
+                this.RaiseEvent("progress", loaded - this.loaded);
+                this.loaded = loaded;
+            }
+        };
+
+        var OnDone = function (event)
+        {
+            if (event.target.status == 200) this.success = true;
+
+            if (!this.loadEndSupport) OnComplete.call(this, event);
+        };
+
+        var OnError = function (event)
+        {
+            if (!this.loadEndSupport) OnComplete.call(this, event);
+        };
+
+        var OnAbort = function (event)
+        {
+            if (!this.loadEndSupport) OnComplete.call(this, event);
+        };
+
+        var OnComplete = function (event)
+        {
+            if (this.hasElement) this.element.cancel.hide();
+            var result = null;
+            if (this.success)
+            {
+                var response = event.target.response;
+                if (typeof response == "object")
+                    result = response;
+                else
+                    result = (JSON && JSON.parse ? JSON.parse(response) : eval("(" + response + ")")).Files;
+            }
+
+            this.xhr = null;
+            this.completed = true
+            if (this.autoclear) this.Dispose();
+            if (!this.success) this.RaiseEvent("cancel", this.file.size, this.loaded);
+            this.RaiseEvent("complete", result);
+        };
+
+        methods.ShowPreview = function ()
+        {
+            if (this.hasElement && this.element.preview.length > 0)
+            {
+                if (Support.BlobUrl)
+                {
+                    this.blobUrl = URL.createObjectURL(this.file);
+                    this.element.preview.css({ backgroundImage: "url(" + this.blobUrl + ")", backgroundSize: "contain", backgroundPosition: "center center", backgroundRepeat: "no-repeat" });
+                    this.element.preview.filter("[crop]").css({ backgroundSize: "cover" }).removeAttr("crop");
+                }
+            }
+        };
+
+        methods.Start = function (url, params)
+        {
+            if (!this.cancelled)
+            {
+                if (Support.FormData)
+                {
+                    this.started = true;
+                    var form = new FormData();
+                    form.append("file", this.file);
+                    for (var key in params)
+                    {
+                        form.append(key, params[key]);
+                    }
+
+                    var xhr = new XMLHttpRequest();
+                    if (xhr.upload) xhr.upload.addEventListener("progress", WS.Exts.BindMethod(OnProgress, this), false);
+                    xhr.addEventListener("progress", function () { }, false);
+                    xhr.addEventListener("load", WS.Exts.BindMethod(OnDone, this), false);
+                    xhr.addEventListener("error", WS.Exts.BindMethod(OnError, this), false);
+                    xhr.addEventListener("abort", WS.Exts.BindMethod(OnAbort, this), false);
+                    xhr.addEventListener("loadend", WS.Exts.BindMethod(OnComplete, this), false);
+                    if (xhr.onloadend === undefined) this.loadEndSupport = false;
+
+                    this.xhr = xhr;
+                    xhr.open("POST", url);
+                    this.RaiseEvent("start");
+                    if (this.hasElement) this.element.progress.main.show();
+                    xhr.send(form);
+                }
+            }
+        };
+
+        methods.Dispose = function ()
+        {
+            if (!this.disposed)
+            {
+                if (Support.BlobUrlDispose && this.blobUrl) URL.revokeObjectURL(this.blobUrl);
+                if (this.hasElement) this.element.main.remove();
+                this.disposed = true;
+            }
+        };
+    })(Upload.prototype);
+
+    var ValidateExts = function (mimes, filetype)
+    {
+        var isValid = false;
+        for (var i = 0; i < mimes.length && !isValid; i++)
+        {
+            var regExp = new RegExp(mimes[i].replace("*", ".*"));
+            isValid = regExp.test(filetype);
+        }
+
+        return isValid;
+    };
+
+    var OnUploadStart = function ()
+    {
+        if (this.currentUploads == 0) this.RaiseEvent("start");
+        this.currentUploads++;
+    };
+
+    var OnUploadProgress = function (loaded)
+    {
+        this.loaded += loaded;
+        if (this.loaded > this.totalSize) this.loaded = this.totalSize;
+        if (this.element) this.element.progress.main.show();
+        UpdateGlobalProgress.call(this, true);
+    };
+
+    var OnFileCancel = function (fileSize, loaded)
+    {
+        this.totalSize -= fileSize;
+        this.loaded -= loaded;
+        this.totalSizeFormatted = FormatSize(this.totalSize, null, 2);
+        if (this.loaded > this.totalSize) this.loaded = this.totalSize;
+        UpdateGlobalProgress.call(this);
+    };
+
+    var OnUploadComplete = function (fileinfo)
+    {
+        if (fileinfo)
+        {
+            for (var i = 0; i < fileinfo.length; i++) this.filesinfo.push(fileinfo[i]);
+            this.RaiseEvent("filecomplete", fileinfo);
+        }
+
+        this.currentUploads--;
+        if (this.currentUploads == 0)
+        {
+            if (this.filesinfo.length > 0)
+                this.RaiseEvent("complete", this.filesinfo);
+            else
+                this.RaiseEvent("cancel");
+
+            this.filesinfo = [];
+            this.disabled = false;
+        }
+    };
+
+    var OnChange = function (event)
+    {
+        var files = event.target.files;
+        OnSelect.call(this, files);
+        this.input.wrap(document.createElement("form"));
+        this.input.closest("form")[0].reset();
+        this.input.unwrap();
+    };
+
+    var OnDragOver = function (event)
+    {
+        if (event.stopPropagation) event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+        if (this.drops) {
+            var textdrop = $(document).find("[name=StartWrapper] div")[0];
+            if (textdrop)
+            {
+                textdrop.innerText = this.params.dragover;
+            }
+        }
+    };
+
+    var OnDragLeave = function (event) {
+        if (event.stopPropagation) event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+        if (this.drops) {
+            var textdrop = $(document).find("[name=StartWrapper] div")[0];
+            if (textdrop) {
+                textdrop.innerText = this.params.dragleave
+            }
+        }
+    };
+
+    var OnDrop = function (event)
+    {
+        if (event.stopPropagation) event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+        if (event.originalEvent.dataTransfer && !this.disabled) OnSelect.call(this, event.originalEvent.dataTransfer.files);
+    };
+
+    var OnSelect = function (files)
+    {
+        var nbValid = 0;
+        var nbLimitedByDiskSpace = 0;
+        var nbLimitedBySize = 0;
+        for (var i = 0; i < files.length && (this.options.multiple || nbValid == 0) ; i++)
+        {
+            if (ValidateExts(this.options.mimes, files[i].type)
+                && (this.options.availableDiskSpace === null || this.options.availableDiskSpace >= files[i].size)
+                && (this.options.maximumFileSize === null || this.options.maximumFileSize >= files[i].size))
+            {
+                nbValid++;
+                if (this.options.availableDiskSpace !== null) this.options.availableDiskSpace -= files[i].size;
+                var upload = new Upload(this.list, this.listTemplate, files[i], this.options.autoclear);
+                upload.RegisterEvent("start", WS.Exts.BindMethod(OnUploadStart, this));
+                upload.RegisterEvent("progress", WS.Exts.BindMethod(OnUploadProgress, this));
+                upload.RegisterEvent("complete", WS.Exts.BindMethod(OnUploadComplete, this));
+                upload.RegisterEvent("cancel", WS.Exts.BindMethod(OnFileCancel, this));
+                this.uploads.push(upload);
+                this.totalSize += files[i].size;
+                this.totalSizeFormatted = FormatSize(this.totalSize, null, 2);
+                UpdateGlobalProgress.call(this);
+
+                if (files[i].type.match("image/.*"))
+                {
+                    upload.ShowPreview();
+                }
+
+                if (this.options.autostart)
+                {
+                    if (!this.options.multiple) this.disabled = true;
+                    upload.Start(this.url, this.params);
+                }
+            }
+
+            else
+            {
+                if (this.options.availableDiskSpace !== null && this.options.availableDiskSpace < files[i].size) nbLimitedByDiskSpace++;
+                if (this.options.maximumFileSize !== null && this.options.maximumFileSize < files[i].size) nbLimitedBySize++;
+            }
+        }
+
+        if (!nbValid) this.RaiseEvent("error");
+
+        if (window.MarketingUpgrade && window.pageData && pageData.xkeyPanel)
+        {
+        	var me = this;
+            var MarketingData = {
+                Title: "",
+                Descr: "",
+                Upgrade: {
+                    Key: pageData.xkeyPanel,
+                    IdSite: pageData.siteId
+                }
+            };
+
+            if (nbLimitedByDiskSpace > 0)
+            {
+            	if (nbLimitedByDiskSpace == files.length) {
+            		data = [
+						{ Key: "HARD_DRIVE_SPACE_TITLE", Type: "editor" },
+						{ Key: "HARD_DRIVE_SPACE_DESCR_REACH", Type: "editor" }
+            		];
+            	}
+            	else
+            	{
+            		data = [
+						{ Key: "HARD_DRIVE_SPACE_TITLE", Type: "editor" },
+						{ Key: "HARD_DRIVE_SPACE_DESCR_EXCEED", Type: "editor" }
+            		];
+            	}
+
+            	AjaxManager.Post("/Editor/Trad/Get", data, 
+				function (Data)
+				{
+					if(Data != null && Data.length > 1)
+					{
+						MarketingData.Title = Data[0];
+						MarketingData.Descr = Data[1].replace("[HARD_DRIVE_SPACE]", Math.floor(me.options.maximumDiskSpace / 1024 / 1024));
+
+						MarketingUpgrade(me.buttons.eq(0), MarketingData);
+					}
+
+				}, function (error) { /*error*/ });
+            }
+            else if (nbLimitedBySize > 0)
+            {
+            	data = [
+					{ Key : "FILE_SIZE_TITLE", Type : "editor" },
+					{ Key: "FILE_SIZE_DESCR", Type: "editor" }
+            	]
+
+            	AjaxManager.Post("/Editor/Trad/Get", data,
+				function (Data)
+				{
+					if (Data != null && Data.length > 1)
+					{
+						MarketingData.Title = Data[0];
+						MarketingData.Descr = Data[1].replace("[FILE_SIZE]", Math.floor(me.options.maximumFileSize / 1024 / 1024));
+
+						MarketingUpgrade(me.buttons.eq(0), MarketingData);
+					}
+
+				}, function (error) { /*error*/ });
+            }
+        }
+    };
+
+    var UpdateGlobalProgress = function (updateOnlyProgress)
+    {
+        updateOnlyProgress = updateOnlyProgress || false;
+        if (this.element)
+        {
+            if (!updateOnlyProgress)
+            {
+                this.element.size.html(this.totalSizeFormatted.value);
+                this.element.unit.html(this.totalSizeFormatted.unit);
+                this.element.progress.unit.html(this.totalSizeFormatted.unit);
+            }
+
+            var percentage = parseFloat((this.loaded / this.totalSize * 100).toFixed(2));
+            this.element.progress.bar.css("width", percentage + "%");
+            this.element.progress.percentage.html(percentage);
+            this.element.progress.size.html(FormatSize(this.loaded, this.totalSizeFormatted.unit, 2).value);
+        }
+
+        if (this.loaded == this.totalSize) this.RaiseEvent("transfercomplete");
+    };
+
+    var _class = function (buttonElements, listElement, params, options, dropElements, listingTemplate, globalProgressElements)
+    {
+        /**
+        Fired when an upload or a group of uploads has started.
+
+        @event start
+        **/
+        /**
+        Fired when an upload or a group of uploads has been completed.
+
+        @event complete
+        @param {Array} filesInfo An Array of object containing uploaded files identifiers, names and extensions.
+        **/
+        /**
+        Fired when an upload or a group of uploads has been cancelled.<br />
+        When options.multiple is set to true, only fired when all uploads have been cancelled.
+
+        @event cancel
+        **/
+        /**
+        Fired when the data transfer for an upload or a group of uploads has been completed.<br />
+        Fired before the event "complete".
+
+        @event transfercomplete
+        **/
+        WS.EventObject.call(this, ["start", "complete", "cancel", "error", "transfercomplete", "filecomplete"]);
+
+        if (!buttonElements) throw "buttonElements cannot be null.";
+        if (buttonElements.length == 0) throw "buttonElements must contain at least one element.";
+        if (!params) throw "params cannot be null.";
+        if (!params.url) throw "Missing parameter : url.";
+
+        params.keeporiginal = (params.keeporiginal === false ? false : true);
+        params.wantresize = params.wantresize || false;
+        params.resizeformat = params.resizeformat || "";
+        if (params.resizeformat && _class.support.imageformats.indexOf(params.resizeformat) == -1) throw "Invalid resize format : " + params.resizeformat + ".";
+        params.resizewidth = params.resizewidth || "";
+        params.resizeheight = params.resizeheight || "";
+        params.wantmipmapping = params.wantmipmapping || false;
+        if (params.wantresize)
+        {
+            if (!params.resizewidth && !params.resizeheight) throw "Missing resize information.";
+        }
+
+        options = options || {};
+        options.mimes = options.mimes || ["*"];
+        options.multiple = options.multiple || false;
+        options.autostart = (options.autostart === false ? false : true);
+        options.autoclear = options.autoclear || false;
+        options.availableDiskSpace = null;
+
+        if (listElement) listElement = listElement.eq(0);
+        if (listingTemplate) listingTemplate = listingTemplate.eq(0);
+
+        this.buttons = buttonElements;
+        this.list = listElement || null;
+        this.drops = dropElements || null;
+        this.listTemplate = (listingTemplate && listingTemplate.clone()) || null;
+        this.params = params;
+        this.options = options;
+        this.url = params.url;
+        delete params.url;
+        this.uploads = [];
+        this.currentUploads = 0;
+        this.filesinfo = [];
+        this.loaded = 0;
+        this.totalSize = 0;
+        this.totalSizeFormatted = FormatSize(this.totalSize, null, 2);
+        this.element = null;
+        this.disabled = false;
+
+        if (globalProgressElements)
+        {
+            this.element = {};
+            this.element.main = globalProgressElements;
+            this.element.size = this.element.main.find("[data=size]");
+            this.element.unit = this.element.main.find("[data=unit]");
+            this.element.progress = {};
+            this.element.progress.main = this.element.main.find("[data=progress]");
+            this.element.progress.bar = this.element.main.find("[data=progress-bar]");
+            this.element.progress.percentage = this.element.main.find("[data=progress-percentage]");
+            this.element.progress.size = this.element.main.find("[data=progress-size]");
+            this.element.progress.unit = this.element.main.find("[data=progress-unit]");
+            UpdateGlobalProgress.call(this);
+        }
+
+        if (this.listTemplate)
+        {
+            this.listTemplate.removeAttr("id");
+            this.listTemplate.find("[id]").removeAttr("id");
+        }
+
+        this.input = $('<input type="file"' + (options.multiple ? ' multiple="multiple"' : '') + ' accept="' + options.mimes.join(",") + '" style="display: inline-block; width: 0px; height: 0px; visibility: hidden; position: absolute; top: 0px; left: 0px;" />');
+        $("body").append(this.input);
+
+        var _me = this;
+        if (Support.File)
+        {
+            this.input.on("change", WS.Exts.BindMethod(OnChange, this));
+            this.buttons.on("click", function () { if (!_me.disabled) _me.input.click(); });
+            if (this.drops)
+            {
+                this.drops.on("dragover", WS.Exts.BindMethod(OnDragOver, this));
+                this.drops.on("dragleave", WS.Exts.BindMethod(OnDragLeave, this));
+                this.drops.on("drop", WS.Exts.BindMethod(OnDrop, this));
+            }
+        }
+    };
+
+    (function (statics)
+    {
+        statics.support = {
+            imageformats: ["image/bmp", "image/jpeg", "image/gif", "image/png"]
+        };
+    })(_class);
+
+    WS.Exts.Inherits(_class, WS.EventObject);
+
+    (function (methods)
+    {
+        /**
+        Remove completed uploads preview.
+        
+        @method Clear
+        **/
+        methods.Clear = function ()
+        {
+            if (!this.options.autoclear)
+            {
+                for (var i = 0; i < this.uploads.length; i++)
+                {
+                    if (this.uploads[i].completed)
+                    {
+                        this.uploads[i].Dispose();
+                    }
+                }
+            }
+
+            if (this.currentUploads == 0)
+            {
+                this.uploads.splice(0, this.uploads.length);
+                this.loaded = 0;
+                this.totalSize = 0;
+                this.totalSizeFormatted = FormatSize(this.totalSize, null, 2);
+                if (this.element) this.element.progress.main.hide();
+                UpdateGlobalProgress.call(this);
+            }
+        };
+
+        /**
+        Start uploads that are currently pending.
+
+        @method Start
+        **/
+        methods.Start = function ()
+        {
+            if (!this.options.autostart)
+            {
+                for (var i = 0; i < this.uploads.length; i++)
+                {
+                    if (!this.uploads[i].started) this.uploads[i].Start();
+                }
+            }
+        };
+
+        /**
+        Destroy the uploader.
+
+        @method Dispose
+        **/
+        methods.Dispose = function ()
+        {
+            if (this.currentUploads == 0)
+            {
+                this.Clear();
+
+                this.input.remove();
+                this.buttons.off("click");
+                if (this.drops) this.drops.off("dragover").off("drop");
+            }
+        };
+    })(_class.prototype);
+
+    return _class;
+})());
+/**
+Explanation of the tag that can be used in upload preview templates.
+
+<pre><code>
+data="preview" : uploaded file preview will be displayed in the elements that have this property. If elements have a crop attribute, the preview will be cropped to completely fill the element.
+data="name" : uploaded file name will be displayed in the elements that have this property.
+data="size" : uploaded file size will be displayed in the elements that have this property.
+data="unit" : uploaded file size unit will be displayed in the elements that have this property.
+data="progress" : elements that have this property will be hidden until upload starts.
+data="progress-bar" : elements that have this property should represent the upload progression.
+data="progress-percentage" : upload progress percentage will be displayed in the elements that have this property.
+data="progress-size" : upload progress size will be displayed in the elements that have this property.
+data="progress-unit" : upload progress size unit will be displayed in the elements that have this property.
+data="loadingoverlay" : elements that will be displayed when the files transfer is over and the files are being handled server-side.
+data="loading" : elements that will display a loading image. Should be contained inside a loading overlay. Image will be displayed inside the overlay if no elements have this property.
+action="cancel" : elements that have this property will cancel the upload when clicked.
+</code></pre>
+
+@class listingTemplate
+@namespace WS.Uploader
+@static
+**/

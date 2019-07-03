@@ -1,0 +1,34 @@
+﻿
+.wsCtText
+{
+    padding: 0 3px;
+}
+
+.wsCtText > *
+{
+    text-overflow: ellipsis;
+}
+
+.wsCtText p
+{
+    margin:0;
+}
+
+.wsCtText a
+{
+    font-weight: inherit !important;
+    font-family: inherit !important;
+    letter-spacing: inherit !important;
+    line-height: inherit !important;
+    font-size: inherit !important;
+}
+
+.Block.Type_Text.wsMobile
+{
+    height: auto !important;
+}
+
+.Block.Type_Text.wsMobile .Block_Wrapper
+{
+    position: initial;
+}

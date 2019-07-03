@@ -1,0 +1,140 @@
+﻿
+WS.Namespace.Create('WS.CaptionManager.UI', (function ()
+{
+    /**
+    note : element parent must be relative
+
+
+    @class CaptionManager.UI
+    @namespace WS
+    @constructor 
+    @param {Object} element Element for which the caption will show up
+    @param {Object} parentelement Element Parent for which the caption will show up
+    @param {Object} params Caption must have a title or descr, if both null, exception will be thrown.
+    @param {String} params.Title
+    @param {String} params.Descr
+    @param {Number} params.Pos (Top, Bottom)
+    @param {Number} params.Align (Left, Center, Right)
+    @param {Boolean} params.AffHover Show onOver or Always showing
+    **/
+    var Class = function (element, parentelement, params)
+    {
+        // Validation
+        if (!element || element.length == 0) throw "element invalid!";
+        if (!parentelement || parentelement.length == 0) throw "parentelement invalid!";
+        if (!params.Title && !params.Descr) throw "title and descr not found!";
+
+        this.container = parentelement;
+        this.element = element;
+        this.params = params;
+
+        var Html = [];
+        Html.push("<div class=\"wsCaptionManager\">");
+        Html.push("<div>");
+        Html.push("<span></span>");
+        Html.push("<span></span>");
+        Html.push("</div>");
+        Html.push("</div>");
+        this.Caption = $(Html.join(""));
+
+        // AddHover 
+        if (this.params.AffHover) AddOver.apply(this);
+
+        // Bind Data
+        Bind.apply(this);
+
+        // append caption to container element
+        this.container.append(this.Caption);
+
+        // if no AddedHover
+        if (!this.params.AffHover) ShowCaption.apply(this);
+    };
+
+    // Private Method(s)
+    var ShowCaption = function ()
+    {
+        this.Caption.css("bottom", "");
+        this.Caption.css("top", "");
+
+        var Width = (this.container.outerWidth(true) < this.element.outerWidth(true)) ? this.container.outerWidth(true) : (this.element.outerWidth(false));
+        this.Caption.css({ "width": Math.round(parseFloat(Width)) + "px" });
+
+
+        if (this.params.Pos == "Bottom")
+        {
+            var Top = (parseInt(this.element.css("margin-top")) == 0 || this.element.css("margin-top") == "") ? this.element.position().top : this.element.css("margin-top");
+            var Bottom = (parseInt(Top) + this.element.outerHeight(true)) - this.Caption.outerHeight(true);
+            if (this.container.outerHeight(true) < this.element.outerHeight(true)) this.Caption.css("bottom", "0px");
+            else this.Caption.css("top", Math.round(Bottom) + "px");
+        }
+        else
+        {
+            var Top = (parseInt(this.element.css("margin-top")) == 0) ? this.element.position().top : this.element.css("margin-top");
+            if (this.container.outerHeight(true) < this.element.outerHeight(true)) Top = 0;
+            this.Caption.css("top", Math.round(parseFloat(Top)) + "px");
+        }
+        this.Caption.removeClass("wsActive").addClass("wsActive");
+    };
+
+    var AddOver = function ()
+    {
+        var Me = this;
+
+        this.Caption.removeClass("wsActive");
+        this.Caption.mouseover(function () { ShowCaption.apply(Me); });
+        this.Caption.mouseout(function () { Me.Caption.removeClass("wsActive") });
+        this.element.mouseover(function () { ShowCaption.apply(Me); });
+        this.element.mouseout(function () { Me.Caption.removeClass("wsActive") });
+    };
+
+    var Bind = function ()
+    {
+        // Title, Descr
+        var Wrapper = this.Caption.find("div");
+        var Title = this.Caption.find("div > span:first-child");
+        var Descr = this.Caption.find("div > span:last-child");
+        if (this.params.Title) Title.text(this.params.Title);
+        if (this.params.Descr) Descr.text(this.params.Descr);
+
+        //params.align // text align in box
+        Wrapper.addClass("ws" + this.params.Align);
+    };
+
+    // Public Method(s)
+    (function (Methods)
+    {
+        /**
+        Remove the Caption
+        
+        @method Remove
+        **/
+        Methods.Remove = function ()
+        {
+            this.Caption.remove();
+        };
+
+        /**
+        Hide the caption
+       
+        @method Hide
+        **/
+        Methods.Hide = function ()
+        {
+            this.Caption.removeClass("wsActive");
+        };
+
+        /**
+        Re-Calculate positions and display caption
+        if necessary
+
+        @method Bind
+        **/
+        Methods.Bind = function ()
+        {
+            if (!this.params.AffHover) ShowCaption.apply(this);
+        };
+
+    })(Class.prototype);
+
+    return Class;
+})());

@@ -1,0 +1,82 @@
+
+#logo
+{
+    margin-left: 0;
+    padding: 0;
+    height: 20px;
+    width: 20px;
+}
+button.accordion{
+    background: rgb(0, 4, 255);
+    color: rgb(255, 255, 255);
+    cursor: pointer;
+    padding: 18px;
+    width: 100%;
+    border-radius: 20px;
+    text-align: left;
+    outline: none;
+    font-size: 15px;
+    transition: 0.4s;
+}
+#sec
+{
+    background: red;
+}
+#ces{
+    background: rgb(18, 138, 7);
+}
+div.panel {
+    padding: 0 18px;
+    background-color: white;
+    max-height: 0;
+    overflow: hidden;
+    transition: 0.6s ease-in-out;
+    opacity: 0;
+}
+
+div.panel.show {
+    opacity: 1;
+    max-height: 500px;  
+}
+.site-footer{
+    background: url('../image/8964.jpg');
+    color: white;
+    padding-top: 30px;
+}
+.bottom-footer{
+    border-top: 1px solid #b2b2b2;
+    padding-top: 10px;
+    color: #b2b2b2;
+}
+.footer-nav
+{
+    text-align: right;
+    list-style: none;
+}
+.footer-nav li{
+    display: inline;
+}
+.footer li:not(:first-child):before{
+    content: '|'
+    padding: 10px;
+}
+.footer-nav a{
+    color: #b2b2b2;
+}
+.footer-nav a:hover{
+    color: #fff;
+    text-decoration: none;
+}
+#two{
+    border-radius: 9px;
+}
+.val{
+    background: url('../image/batim/1.jpg');
+    background-attachment: fixed;
+    background-size: cover;
+}
+#all{
+    background:white;
+    margin-top: 400px;
+    border-radius: 50px;
+}

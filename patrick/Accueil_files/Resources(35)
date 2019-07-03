@@ -1,0 +1,246 @@
+﻿
+WS.Namespace.Create("WS.Editor.Slideshow.UI", (function()
+{
+    var Transitions = {
+        None: function(oldSlide, newSlide)
+        {
+            newSlide.css({ visibility: "", zIndex: "1", opacity: "1" });
+            this.transitionCompleteDelegate();
+        },
+
+        SlideLeft: function(oldSlide, newSlide)
+        {
+            newSlide.css({ left: "100%", visibility: "", zIndex: "1", opacity: "1" });
+            newSlide.velocity({ left: "0" }, 1000, this.transitionCompleteDelegate);
+        },
+
+        SlideRight: function(oldSlide, newSlide)
+        {
+            newSlide.css({ left: "-100%", visibility: "", zIndex: "1", opacity:"1" });
+            newSlide.velocity({ left: "0" }, 1000, this.transitionCompleteDelegate);
+        },
+
+        SlideTop: function(oldSlide, newSlide)
+        {
+            newSlide.css({ top: "100%", visibility: "", zIndex: "1", opacity: "1" });
+            newSlide.velocity({ top: "0" }, 1000, this.transitionCompleteDelegate);
+        },
+
+        SlideBottom: function(oldSlide, newSlide)
+        {
+            newSlide.css({ top: "-100%", visibility: "", zIndex: "1", opacity: "1" });
+            newSlide.velocity({ top: "0" }, 1000, this.transitionCompleteDelegate);
+        },
+
+        FadeIn: function(oldSlide, newSlide)
+        {
+            newSlide.css({ opacity: "0", visibility: "", zIndex: "1" });
+            newSlide.velocity({ opacity: "1" }, 1000, this.transitionCompleteDelegate);
+        },
+
+        FadeOut: function(oldSlide, newSlide)
+        {
+            newSlide.css({ opacity: "1", visibility: "" });
+            oldSlide.css({ opacity: "1", zIndex: "1" });
+            oldSlide.velocity({ opacity: "0" }, 1000, this.transitionCompleteDelegate);
+        }
+    };
+
+    var ExecuteTransition = function(index)
+    {
+        var EffectDelegate = Transitions[this.settings.Transition.Effect];
+        if (EffectDelegate)
+        {
+            this.slideObjects[index].Load(); // Load slide if not already loaded
+            this.previousIndex = this.index;
+            this.index = index;
+            if (this.navigation) this.navigation.Update();
+            EffectDelegate.call(this, this.slides.eq(this.previousIndex), this.slides.eq(index));
+        }
+    };
+
+    var TransitionComplete = function()
+    {
+        this.slides.eq(this.previousIndex).css({ visibility: "hidden", zIndex: "", opacity: "0" });
+        this.slides.eq(this.index).css("z-index", "");
+        this.previousIndex = null;
+        this.slideObjects[(this.index + 1) % this.slides.length].Load(); // Pre-load next slide
+        SetupAutoPlay.call(this);
+    }
+
+    var SetupAutoPlay = function()
+    {
+        if (this.settings.AutoPlay && (this.index + 1 < this.slides.length || this.settings.Repeat))
+        {
+            this.autoPlayTimer = window.setTimeout(this.autoPlayDelegate, this.settings.Transition.Delay * 1000);
+        }
+    };
+
+    var Navigation = function(control)
+    {
+        this.control = control;
+        this.Arrows = control.element.find(".wsNavigation.wsArrows > div");
+        this.Dots = control.element.find(".wsNavigation.wsDots > div");
+
+        var me = this;
+        this.Arrows.on("click", function()
+        {
+            if (me.control.previousIndex == null)
+            {
+                if (me.control.autoPlayTimer)
+                {
+                    window.clearTimeout(me.control.autoPlayTimer);
+                    me.control.autoPlayTimer = null;
+                }
+
+                var index = me.control.index + 1;
+                if (me.Arrows.index(this) == 0) index -= 2;
+                if (index < 0) index = me.control.slides.length - 1;
+                ExecuteTransition.call(me.control, index % me.control.slides.length);
+            }
+        });
+
+        this.Dots.on("click", function()
+        {
+            if (me.control.previousIndex == null && !$(this).hasClass("wsCurrent"))
+            {
+                if (me.control.autoPlayTimer)
+                {
+                    window.clearTimeout(me.control.autoPlayTimer);
+                    me.control.autoPlayTimer = null;
+                }
+
+                var index = me.Dots.index(this);
+                ExecuteTransition.call(me.control, index);
+            }
+        });
+    };
+
+    (function(methods)
+    {
+        methods.Update = function()
+        {
+            this.Arrows.eq(0).css("visibility", this.control.index > 0 || this.control.settings.Repeat ? "" : "hidden");
+            this.Arrows.eq(1).css("visibility", this.control.index < this.control.slides.length - 1 || this.control.settings.Repeat ? "" : "hidden");
+            this.Dots.removeClass("wsCurrent").eq(this.control.index).addClass("wsCurrent");
+        };
+    })(Navigation.prototype);
+
+    var Content = (function () {
+
+        var _class = function (element, id, type, data) {
+           
+            var me = this;
+            this.Element = element;
+            this.Id = id;
+            this.Type = type;
+            this.Data = data;
+        };
+
+        (function (methods) {
+            methods.GetWidth = function () {                
+                return this.Element.width();
+            };
+
+            methods.GetHeight = function () {
+                return this.Element.height();
+            };
+        })(_class.prototype);
+
+        return _class;
+    })();
+
+    var Slide = (function()
+    {
+        var _class = function(element, data, flagged)
+        {
+            this.element = element;
+            this.data = data;
+            this.flagged = flagged;
+            this.loaded = false;
+        };
+
+        (function(methods)
+        {
+            methods.Load = function()
+            {
+                if (!this.loaded)
+                {
+                    if (this.data.BackgroundCSS) this.element.attr("style", this.element.attr("style") + ";" + this.data.BackgroundCSS);
+                    var contentElements = this.element.children(".Block");
+                    for (var i = 0; i < contentElements.length; i++)
+                    {
+                        var DataContent = $.grep(this.data.Contents, function (e) { return e.Id == contentElements.eq(i).attr("id").replace("ct_", ""); });
+
+                        if (DataContent != null && DataContent != undefined && DataContent != 'undefined' && DataContent.length)
+                        {
+                            if (DataContent[0].BlockLevelStyle) contentElements.eq(i).attr("style", contentElements.eq(i).attr("style") + ";" + DataContent[0].BlockLevelStyle);
+                            if (window.WS && window.WS.IsMobile) contentElements.eq(i).css("z-index", "auto");
+                            if (DataContent[0].WrapperLevelStyle) contentElements.eq(i).children(".Block_Wrapper").attr("style", DataContent[0].WrapperLevelStyle);
+
+
+                            var content = new Content(contentElements.eq(i), DataContent[0].Id, DataContent[0].Type, DataContent[0].Data);
+                            if (pageData.flagged !== undefined) new window.ContentLoader(content.Element);
+                            else if (content.Data) new ContentHandlers.PreviewContentLoader(content);
+                            else new ContentHandlers.ExternalContentLoader(content, content.Element, this.flagged);
+                        }
+                    }
+
+                    this.loaded = true;
+                }
+            };
+        })(_class.prototype);
+
+        return _class;
+    })();
+
+    var _class = function(control, element, data, flagged)
+    {
+        this.settings = data.Settings;
+        this.element = element;
+        this.slides = element.children(".wsSlide");
+        this.index = 0;
+        this.previousIndex = null;
+        this.transitionCompleteDelegate = (function(control) { return function() { TransitionComplete.call(control); }; })(this);
+        this.autoPlayTimer = null;
+        this.autoPlayDelegate = null;
+        this.navigation = null;
+        if (this.slides.length > 1 && data.Settings.Navigation.Type != "None") this.navigation = new Navigation(this);
+
+        this.slideObjects = [];
+        for (var i = 0; i < data.Slides.length; i++)
+        {
+            this.slideObjects.push(new Slide(this.slides.eq(i), data.Slides[i], flagged));
+        }
+
+        this.slideObjects[0].Load();
+
+        var fixedContentElements = element.children(".wsFixedSlide").children(".Block");
+        for (var i = 0; i < data.FixedContents.length; i++)
+        {
+            var content = new Content(fixedContentElements.eq(i), data.FixedContents[i].Id, data.FixedContents[i].Type, data.FixedContents[i].Data);
+
+            if (pageData.flagged !== undefined) new window.ContentLoader(content.Element);
+            else if (content.Data) new ContentHandlers.PreviewContentLoader(content);
+            else new ContentHandlers.ExternalContentLoader(content, content.Element, flagged);
+        }
+
+        this.slides.eq(0).css("visibility", "");
+        if (this.slides.length > 1) this.slideObjects[1].Load(); // Pre-load next slide
+        if (data.Settings.AutoPlay && this.slides.length > 1)
+        {
+            var me = this;
+            this.autoPlayDelegate = function()
+            {
+                me.autoPlayTimer = null;
+                ExecuteTransition.call(me, (me.index + 1) % me.slides.length);
+            };
+
+            SetupAutoPlay.call(this);
+        }
+
+        if (control.onLoaded) control.onLoaded(this);
+    };
+
+    return _class;
+})());

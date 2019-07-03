@@ -1,0 +1,60 @@
+﻿
+.wsMapWrapper
+{
+    overflow: hidden;
+    border-radius: inherit;
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+}
+
+#wsMapCanvas
+{
+    height: 100%;
+    width: 100%;
+}
+
+.gmnoprint .gm-style-mtc div
+{
+    font-size: 1.5em !important;
+}
+
+.gm-style .gm-style-iw
+{
+    overflow: hidden !important;
+}
+
+.gm-style a, .gm-style label
+{
+    font-size: 0.6em !important;
+}
+
+#wsInfoBulle:first-line
+{
+    font-weight: bold;
+}
+
+.wsAddress
+{
+    font: normal 1.2em arial;
+    display: none;
+}
+
+.R_Height #wsMapCanvas
+{
+    min-height: 140px;
+    min-width: 98%;
+    height: 55%;
+}
+
+.R_Height .wsAddress
+{
+    display: block;
+}
+
+.R_Height .wsAddress:first-line
+{
+    font-weight: bold;
+}

@@ -1,0 +1,357 @@
+﻿#stickyFooter {
+    position: fixed;
+    bottom: 0;
+    height: 40px;
+    width: 100%;
+    background-color: #292929;
+    margin: 0;
+    color: #fff;
+    font-family: 'Signika', sans-serif;
+}
+
+
+
+#stickyFooter input 
+{
+    border: 1px solid #292929;
+}
+
+#stickyFooter input.invalid 
+{
+    border: 1px solid red;
+}
+
+#defaultSF {
+    display: flex;
+    cursor: pointer;
+}
+
+#stickyFooter a {
+    color: #fff;
+}
+
+#logoWebSelfSF {
+    width: 70px;
+    height: 25px;
+}
+
+.sectionSF {
+    box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    padding: 13px 20px;
+}
+
+#chevronSF {
+    width: 20px;
+    position: fixed;
+    transform: rotate(180deg);
+}
+
+#leftSF {
+    text-align: left;
+    width: 35%;
+}
+
+#rightSF {
+    text-align: right;
+    width: 35%;
+}
+
+#centreSF {
+    text-align: center;
+    position: relative;
+    width: 30%;
+}
+
+#hiddenSF {
+    text-align: center;
+    line-height: 25px;
+    display: none;
+    position: relative;
+}
+
+#hiddenSF input {
+    height: 40px;
+    border-radius: 4px;
+    border: none;
+    margin-right: 6px;
+}
+
+#hiddenSF input[type=text], #hiddenSF input[type=password] 
+{
+    width: 200px;
+    color: #666;
+    padding-left: 8px;
+}
+
+#hiddenSF input[type=button] 
+{
+    width: 120px;
+    color: #fff;
+    background-color: #0bafc2;
+    cursor: pointer;
+}
+
+#hiddenSF input[type=button]:hover 
+{
+    background-color: #23c4d6;
+}
+
+.invisibleLabel {
+    display: none;
+}
+
+#titleSF {
+    font-size: 22px;
+    position: absolute;
+    top: 70px;
+    width: 100%;
+    left: 0;
+}
+
+#secondarySF {
+    color: #aaa;
+    position: absolute;
+    top: 72px;
+    width: 100%;
+    left: 0;
+}
+
+#formSF {
+    position: absolute;
+    top: 115px;
+    width: 100%;
+    left: 0;
+    margin: 0;
+}
+
+#hiddenSF .formGroupSF {
+    display: inline-block;
+}
+
+
+/* Breaking point */
+@media screen and (max-width: 1003px) {
+    #hiddenSF .formGroupSF {
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    #hiddenSF input,
+    #hiddenSF input[type="text"],
+    #hiddenSF input[type="password"] {
+        width: 47%;
+    }
+}
+
+
+@media screen and (max-width: 735px) {
+    .sectionSF {
+        position: relative;
+        display: flex;
+    }
+
+    #rightSF,
+    #rightSF a 
+    {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 535px) {
+    #titleSF {
+        font-size: 15px;
+    }
+
+    #logoWebSelfSF {
+        width: 60px;
+        height: 21px;
+    }
+
+    .sectionSF {
+        padding: 13px 10px;
+    }
+
+    #secondarySF {
+        font-size: 10px;
+    }
+
+    #stickyFooter {
+        height: 60px;
+    }
+
+    #hiddenSF input,
+    #hiddenSF input[type="text"],
+    #hiddenSF input[type="button"],
+    #hiddenSF input[type="password"] {
+        box-sizing: border-box;
+        width: 90%;
+        margin: 0 5% 5px;
+        padding: 0 0 0 4px;
+    }
+
+    #hiddenSF .formGroupSF {
+        margin-bottom: 0;
+    }
+}
+
+.scrollbarMeasure {
+    width: 100px;
+    height: 100px;
+    overflow: scroll;
+    position: absolute;
+    top: -9999px;
+}
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 20; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; 
+    padding: 20px;
+    width: 272px; 
+    border-radius: 3px;
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#PopupSubscribe input
+{
+    margin: 0 0 0 10px;
+    margin-left: 0;
+    padding: 5px;
+    width: 260px;
+}
+
+#PopupSubscribe input[type=checkbox] {
+    width: auto;
+}
+
+#PopupSubscribe .wsCloseWrapper{
+    text-align:right;
+}
+
+#PopupSubscribe .close{
+    float:none;
+}
+
+#PopupSubscribe input:not([type=button]){
+    border: 1px solid #aaa;
+}
+
+#PopupSubscribe .wsInputWrapper:not(:first-of-type)
+{
+    margin-top: 10px;
+}
+
+#PopupSubscribe input[name=SendEmailButton]
+{
+    margin: 20px 0 0 0;
+    padding: 8px 12px;
+    box-sizing: border-box;
+    cursor: pointer;
+    width: auto;
+}
+
+.PopupConfirmation
+{
+    display:none;
+}
+
+#PopupSubscribe .wsCaptcha
+{
+    width: 200px;
+    padding: 5px;
+    background-color: #c4c4c4;
+    margin-top: 20px;
+}
+
+#PopupSubscribe .wsCaptcha *
+{
+    vertical-align: middle;
+}
+
+#PopupSubscribe .wsCaptcha .wsImageContainer
+{
+    background-color: #fff;
+    padding-left: 10px;
+    padding-top: 5px;
+    height: 35px;
+    margin-bottom: 5px;
+}
+
+#PopupSubscribe .wsCaptcha .wsImageContainer img
+{
+    width: 150px;
+    height: 30px;
+}
+
+#PopupSubscribe .wsCaptcha input[type="text"]
+{
+    width: 150px;
+    height: 20px;
+    font-size: 10pt;
+    padding: 2px;
+}
+
+#PopupSubscribe .wsCaptcha input[type="image"]
+{
+    width: 20px;
+    height: 20px;
+    margin-left: 5px;
+}
+
+#PopupSubscribe .wsField.wsError .wsCaptcha [name=captcha]{
+    border:1px solid red;
+}
+
+/* ==== Paid add ====  */
+#PoweredByFooter
+{
+    background-color: #eee;
+    color: #b0bdcb;
+    text-align: right;
+    font-size: 12px;
+    padding : 5px 10px;
+    font-family: 'Signika', sans-serif;
+}
+
+#PoweredByFooter a
+{
+    text-decoration: none;
+    color: #777;
+}
+
+#PoweredByFooter a:hover
+{ 
+    color: #b0bdcb;
+}

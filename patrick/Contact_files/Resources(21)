@@ -1,0 +1,551 @@
+﻿
+WS.Namespace.Create('NovAxis.Select', (function ()
+{
+    /**
+    @class Select
+    @namespace NovAxis
+    @constructor
+    @param {jQuery} [select] A jQuery object containing a select html element.
+    @param {Array<String>} [classes] Array of class names to apply to the control.
+    @param {Integer} [width] The width of the control. Automatic if omitted.
+    @param {Integer} [height] The height of the control. Automatic if omitted.
+    @param {Integer} [maxHeight] The maximum height of the selection menu. Automatic if omitted.
+    **/
+    var Class = function (select, classes, width, height, maxHeight)
+    {
+        if (!select || select.length == 0) throw "Select control cannot be null.";
+
+        /**
+        Fired when the value is changed.
+
+        @event change
+        **/
+        WS.EventObject.call(this, ['change', 'action']);
+
+        var elements = CreateControl(select);
+        this.element = elements.eq(0);
+        this.list = elements.eq(1);
+        this.listContent = this.list.find('.naSelectListContent');
+        this.listBottom = this.list.find('.naSelectListBottom');
+        if (width) this.element.css("width", width + "px");
+        if (height) this.element.css("height", height + "px");
+        if (classes && classes.length > 0) elements.addClass(classes.join(" "));
+        this.maxHeight = maxHeight || 500;
+
+        var me = this;
+        this.scrollBar = null;
+
+        this.select = select;
+        this._internal = {};
+        this._internal.value = null;
+        this._internal.text = null;
+        this._internal.initialized = false;
+        this._internal.disabled = false;
+
+        value = this.select.find("option[selected]").attr("value") || null;
+        if (value == null) value = this.list.find(".naSelectOption").eq(0).attr("data") || null;
+        if (value != null) SelectValue.call(this, value);
+
+        this.data = this.select.find("option[selected]").data();
+
+        AddEventHandler.apply(this);
+
+        this.select.after(this.element);
+        this.select.detach();
+        $("body").append(this.list);
+    };
+
+    WS.Exts.Inherits(Class, WS.EventObject);
+
+    // Private Method(s)
+    var CreateControl = function (select)
+    {
+        var Html = [];
+        Html.push("<div class=\"naSelect\">");
+        Html.push("<div class=\"naSelectBody\">");
+        Html.push("<div class=\"naSelectValue\"></div>")
+        Html.push("<div class=\"naSelectOpen\"></div>")
+        Html.push("</div>");
+        Html.push("</div>");
+
+        Html.push("<div class=\"naSelectList\">");
+        Html.push("<div class=\"naSelectListContent\">");
+   
+        select.find("option").each(function () {
+            var option = $(this);
+            var disabled = false;
+            var actionName = option.data("optionaction");
+            if (typeof actionName === "string" && actionName !== "")
+            {
+                Html.push(CreateActionOption(option.text(), actionName, option.attr("style"), option.data(), disabled));
+            } else {
+                if (typeof option.attr("disabled") !== typeof undefined && option.attr("disabled") !== false) disabled = true;
+                Html.push(CreateOption(option.text(), option.attr("value"), option.attr("style"), option.data(), disabled));
+            }
+        });
+
+        Html.push("</div>");
+        Html.push("<div class=\"naSelectListBottom\"></div>");
+        Html.push("</div>");
+
+        return $(Html.join(""));
+    };
+
+    var CreateOption = function (text, value, style, data, disabled)
+    {
+        if (typeof disabled == "undefined" || disabled == "") disabled = false;
+ 
+        value = value || "";
+        style = GetStyleString(style);
+
+        var dataAttr = GetDataAttributes(data);
+        return "<div class=\"naSelectOption " + (disabled ? "optionDisabled" : "") + "\"" + style + " data=\"" + value + "\"" + dataAttr + ">" + text + "</div>";
+
+    };
+
+    var CreateActionOption = function(text, actionName, style, data, disabled)
+    {
+        if (typeof disabled == "undefined" || disabled == "") disabled = false;
+        if (typeof actionName !== "string" || actionName.length === 0) 
+            throw new Error("Action option must have a name.");
+        
+        data = data || {};
+        data.optionaction = actionName;        
+
+        style = GetStyleString(style);
+
+        return "<div class=\"naSelectActionOption" + (disabled ? " optionDisabled" : "") + "\"" + style + GetDataAttributes(data) + ">" + text + "</div>";
+    };
+
+    var CreateSeparator = function (text, style, data)
+    { 
+        style = GetStyleString(style);
+
+        var data_add = "";
+        for (var key in data) {
+            data_add += " data-" + key + "=\"" + data[key] + "\"";
+        }
+        return (
+            "<div class=\"naSelectSeparator\"" + style + data_add + ">" + 
+                "<div class=\"naSelectSeparatorText\">" + text + "</div>" + 
+            "</div>"
+        );
+    };
+
+    var GetDataAttributes = function (data) {
+        data = (typeof data === 'object') ? data : {};
+        var dataStr = "";
+        for (var key in data) {
+            dataStr += " data-" + key + "=\"" + data[key] + "\"";
+        }
+        return dataStr;
+    };
+
+    var GetStyleString = function(style)
+    {
+        return style ? " style=\"" + style + "\"" : "";
+    };
+
+    var ShowList = function ()
+    {
+        if (!this.scrollBar) this.scrollBar = WS.ScrollBar.init(this.listContent.get(0));
+
+        var offset = this.element.offset();
+        var width = (getComputedStyle ? parseFloat(getComputedStyle(this.element[0]).width) : this.element.width());
+        var height = (getComputedStyle ? parseFloat(getComputedStyle(this.element[0]).height) : this.element.height());
+        this.list.css({ left: offset.left + "px", top: (offset.top + height) + "px", "min-width": width + "px", maxHeight: Math.min(this.maxHeight, $(window).height() - (offset.top - $(window).scrollTop()) - height - 20) + "px" }).addClass("naSelectActive");
+        this.scrollBar.scrollTo(0);
+        this.element.addClass("naSelectActive");
+        var _me = this;
+
+        //add keydown listener
+        $(window).bind('keydown', function (event)
+        {
+            event.stopPropagation();
+            event.preventDefault();
+            switch (event.keyCode)
+            {
+                case 13:
+
+                    _me.list.find('.hover').click();
+                    break;
+
+                case 38:
+
+                    var element = _me.list.find('.hover');
+                    SelectByArrow.call(_me, element, true);
+                    break;
+
+                case 40:
+
+                    var element = _me.list.find('.hover');
+                    SelectByArrow.call(_me, element);
+                    break;
+
+                default:
+
+                    SearchValue.call(_me, String.fromCharCode(event.keyCode));
+                    break;
+            }
+        });
+    };
+
+    var HideList = function ()
+    {
+        this.list.removeClass("naSelectActive").removeAttr("style");
+
+        //unselect hover on close
+        this.list.find('.hover').removeClass('hover');
+        this.element.removeClass("naSelectActive");
+
+        //remove keydown listener
+        $(window).unbind('keydown');
+    };
+
+    /*
+    Remove the hover class on cursor move in list to avoid double highlight element
+    */
+    var BindListMouseMove = function () {
+        this.list.off("mousemove").on('mousemove', function () {
+            $(this).find('.hover').removeClass('hover');
+        });
+    };
+
+    /*
+    Handle navigation in list by arrow key
+    element : starting html object element
+    isUp : true if the up arrow is selected
+    */
+    var SelectByArrow = function (element, isUp)
+    {
+        if (element.length == 0) element = this.list.find('.naSelectOption').eq(0).addClass('hover');
+        var newElement = element[isUp ? "prev" : "next"](".naSelectOption");
+        if (newElement.length > 0)
+        {
+            element.removeClass("hover");
+            newElement.addClass("hover");
+            MoveList.call(this, newElement, isUp);
+            BindListMouseMove.call(this);
+        }
+    };
+
+    /*
+    Position list handler. If list height is smaller than the container, the position stay the same
+    element - selected option in list
+    isUp - true if up arrow is press
+    */
+    var MoveList = function (element, isUp)
+    {
+        var position = element.position().top;
+        if (isUp)
+        {
+            if (position < 0) this.scrollBar.scrollTo(Math.round(this.listContent.scrollTop() + position));
+        }
+
+        else
+        {
+            var listHeight = this.listContent.height();
+            var elementHeight = element.innerHeight();
+            if (position > listHeight - elementHeight) this.scrollBar.scrollTo(Math.round(this.listContent.scrollTop() + position - listHeight + elementHeight));
+        }
+    };
+
+    /*
+    Look for the first option starting by the selected key
+    value - the selected character
+    **/
+    var SearchValue = function (value)
+    {
+        var option = this.list.find('.naSelectOption');
+        var options = [];
+        for (var i = 0; i < option.length; i++)
+        {
+            if (option.eq(i).html().toLowerCase().indexOf(value.toLowerCase()) === 0) options.push(option.eq(i));
+        }
+
+        var selectedIndex = -1;
+        for (var i = 0; i < options.length && selectedIndex == -1; i++)
+        {
+            if (options[i].hasClass("hover")) selectedIndex = i;
+        }
+
+        if (++selectedIndex == options.length) selectedIndex = 0;
+
+        //scroll list to value and hightlight the right option
+        if (options.length > 0)
+        {
+            this.listContent.find('.hover').removeClass('hover');
+            this.scrollBar.scrollTo(Math.round(this.listContent.scrollTop() + options[selectedIndex].position().top - (this.listContent.height() / 2)));
+            options[selectedIndex].addClass('hover');
+            BindListMouseMove.call(this);
+        }
+    };
+
+    var SelectValue = function (value)
+    {
+        if (value != this._internal.value)
+        {
+            var option = this.list.find('.naSelectOption[data="' + value + '"]');
+            if (option.length > 0)
+            {
+                this._internal.value = value;
+                this._internal.text = option.eq(0).text();
+                this.list.find(".naSelectOption").removeClass("naSelectOptionSelected");
+                option.eq(0).addClass("naSelectOptionSelected");
+                this.element.find(".naSelectValue").removeClass("optionDisabled").text(option.eq(0).text());
+                if (option.eq(0).hasClass("optionDisabled")) this.element.find(".naSelectValue").addClass("optionDisabled");
+                if (this._internal.initialized) this.RaiseEvent("change", value, option.eq(0).text());
+                this._internal.initialized = true;
+            }
+        }
+    };
+
+    var SelectAction = function(actionName)
+    {
+        if (typeof actionName === "string" && this._internal.initialized)
+        {
+            this.RaiseEvent("action", actionName);
+        }
+    };
+  
+    var AddEventHandler = function ()
+    {
+        var me = this;
+        me._internal.events = {};
+
+        me._internal.events.clickHandler = function (event)
+        {
+            var target = $(this);
+            if (target.hasClass("naSelectOption")) SelectValue.call(me, target.attr("data"));
+            if (target.hasClass("naSelectActionOption")) SelectAction.call(me, target.data("optionaction"));
+
+            if (event.type == "click" || !$.contains(me.list[0], event.target))
+            {
+                HideList.call(me);
+                $(document).off("mousedown", me._internal.events.clickHandler);
+                event.stopPropagation();
+            }
+        };
+
+        this.element.find(".naSelectBody").on("click", function (event) { 
+            if (!me._internal.disabled) 
+            { 
+                ShowList.call(me); 
+                $(document).on("mousedown", me._internal.events.clickHandler); 
+                event.stopPropagation(); 
+            }
+        });
+        this.list.find(".naSelectOption, .naSelectActionOption").on("click", me._internal.events.clickHandler);
+    };
+
+    // Public Method(s)
+    (function (Methods)
+    {
+        /**
+        Add an option.
+      
+        @method Add
+        **/
+        Methods.Add = function (text, value)
+        {
+            var option = $(CreateOption(text, value));
+            
+            option.on("click", this._internal.events.clickHandler);
+            
+            this.listContent.append(option);
+            if (this._internal.value == null) SelectValue.call(this, value);
+        };
+
+        /**
+        Add an action option.
+      
+        @method AddAction
+        **/
+        Methods.AddAction = function (text, actionName, fixed)
+        {
+            var actionOption = $(CreateActionOption(text, actionName));
+            
+            actionOption.on("click", this._internal.events.clickHandler);
+            
+            if (fixed) {
+                this.listBottom.append(actionOption);
+            } else {
+                this.listContent.append(actionOption);
+            }
+        };
+
+        /**
+        Add a separator.
+      
+        @method AddSeparator
+        **/
+        Methods.AddSeparator = function(text)
+        {
+            var separator = $(CreateSeparator(text));
+            this.listContent.append(separator);
+            return separator;
+        };
+
+        /**
+        Remove an option.
+
+        @method Remove
+        **/
+        Methods.Remove = function (value)
+        {
+            this.list.find('.naSelectOption[data="' + value + '"]').remove();
+            if (value == this._internal.value)
+            {
+                if (this.list.find(".naSelectOption").length > 0)
+                    SelectValue.call(this, this.list.find(".naSelectOption").eq(0).attr("data"));
+                else
+                    this.Clear();
+            }
+        };
+
+        /**
+        Get the options list
+
+        @method GetOptions
+        **/
+        Methods.GetOptions = function ()
+        {
+            var Options = [];
+            for (var i = 0; i< this.list.find(".naSelectOption").length; i++)
+            {
+                Options.push(this.list.find(".naSelectOption").eq(i).attr("data"));
+            }
+
+            return Options;
+        };
+
+        /**
+        Get the data
+
+        @method GetDataByValue
+        **/
+        Methods.GetDataByValue = function (value) {
+            return this.list.find(".naSelectOption[data=" + value + "]").data();
+        };
+
+        /**
+        Clear all option.
+
+        @method Clear
+        **/
+        Methods.Clear = function () {
+            this.list.find('.naSelectOption, .naSelectSeparator, .naSelectActionOption').remove();
+            this._internal.value = null;
+            this._internal.text = null;
+            this._internal.initialized = false;
+        };
+
+        /**
+        Get the selected value.
+    
+        @method GetValue
+        **/
+        Methods.GetValue = function ()
+        {
+            return this._internal.value;
+        };
+
+        /**
+        Set the selected value.
+    
+        @method SetValue
+        **/
+        Methods.SetValue = function (value)
+        {
+            this._internal.initialized = false;
+            SelectValue.call(this, value);
+            this._internal.initialized = true;
+        };
+
+        /**
+       Set invalid style.
+
+       @method SetInvalid
+       **/
+        Methods.SetInvalid = function () {
+            var SelectorBox = this.element.find(".naSelectBody");
+            SelectorBox.addClass("naSelectInvalid");
+            SelectorBox.off("mouseenter").on("mouseenter", function () { SelectorBox.removeClass("naSelectInvalid") });
+        };
+
+        /**
+        Remove invalid style.
+
+        @method RemoveInvalid 
+        **/
+        Methods.RemoveInvalid = function () {
+            var SelectorBox = this.element.find(".naSelectBody");
+            SelectorBox.removeClass("naSelectInvalid");
+            SelectorBox.off("mouseenter");
+        };
+
+        /**
+        Get the selected text.
+   
+        @method GetText
+        **/
+        Methods.GetText = function ()
+        {
+            return this._internal.text;
+        };
+
+        /**
+        Disable the control.
+   
+        @method Disable
+        **/
+        Methods.Disable = function ()
+        {
+            this.element.addClass("naSelectDisabled");
+            this._internal.disabled = true;
+        };
+
+        /**
+        Enable the control.
+  
+        @method Enable
+        **/
+        Methods.Enable = function ()
+        {
+            this.element.removeClass("naSelectDisabled");
+            this._internal.disabled = false;
+        };
+
+        /**
+        Rebind the control.
+  
+        @method Rebind
+        **/
+        Methods.Rebind = function (select) {
+            this.Clear();
+            var me = this;
+            select.find("option").each(function () { me.Add($(this).text(), $(this).attr("value")) });
+
+            value = select.find("option[selected]").attr("value") || null;
+            if (value != null) SelectValue.call(this, value);
+        };
+
+        /**
+        Destroy the control.
+ 
+        @method Destroy
+        **/
+        Methods.Destroy = function ()
+        {
+            this.element.after(this.select);
+            this.element.remove();
+            this.list.remove();
+            this.element = null;
+            this.select = null;
+            this._internal = null;
+        };
+
+    })(Class.prototype);
+
+    return Class;
+})());

@@ -1,0 +1,207 @@
+﻿/*************************************/
+/* ResourceManager                   */
+/* use for, script, style, ...       */
+/*************************************/
+
+var ResourceManager = (function ()
+{
+    // Static
+    var WorkerInterval = null;
+    var WorkerWorking = false;
+    var WorkerCallBack = function (CallBacks, Resources)
+    {
+
+        var mycallbacks = CallBacks.slice();
+
+        // loop throw all callback
+        for (var i = 0; i <= mycallbacks.length - 1; i++)
+        {
+            for (var j = 0; j < mycallbacks[i]._WaitingFor.length; j++)
+            {
+                var resource = Utility.FindByName(mycallbacks[i]._WaitingFor[j], Resources)
+                if (resource && resource._Loaded)
+                {
+                    mycallbacks[i]._WaitingFor.splice(j, 1);
+                    j--;
+                }
+            }
+
+            if (mycallbacks[i]._WaitingFor.length === 0)
+            {
+                try
+                {
+                    mycallbacks[i].Execute();
+                }
+                catch (ex)
+                {
+                    var error = (ex && typeof ex === "string") ? ex : "no error msg possible!";
+                    if (ex && ex.stack) error = ex.stack;
+                    if (console && console.error) console.error(error);
+                }
+                CallBacks.remove(mycallbacks[i]);
+            }
+        }
+
+        // if all resources are loaded, stop the worker.
+        var NbLoaded = 0;
+        for (var i = 0; i <= Resources.length - 1; i++) { if (Resources[i]._Loaded) NbLoaded += 1; }
+        if (NbLoaded === Resources.length)
+        {
+            window.clearInterval(WorkerInterval);
+            WorkerWorking = false;
+        }
+    };
+
+    // Class Resource
+    var Resource = (function ()
+    {
+        var Class = function (Name, Loaded)
+        {
+            if (!Name) throw "Name cannot be null.";
+
+            this._Name = Name;
+            this._Loaded = Loaded;
+        };
+
+        return Class;
+    })();
+
+    // Class CallBack
+    var Callback = function (Handler, Context, WaitingFor)
+    {
+        if (!Handler) throw "Handler cannot be null.";
+        if (!Context) throw "Context cannot be null.";
+
+        this._Handler = Handler;
+        this._Context = Context || window;
+        this._WaitingFor = [];
+        if (WaitingFor) this._WaitingFor = WaitingFor;
+    };
+
+    // Public Method(s)
+    (function (Methods)
+    {
+        Methods.Execute = function ()
+        {
+            this._Handler.apply(this._Context, arguments);
+        };
+
+    })(Callback.prototype);
+
+
+    // Constructor Resource manager
+    var Class = function ()
+    {
+        this._Resources = [];
+        this._CallBack = [];
+    };
+
+    // Public Method(s)
+    (function (Methods)
+    {
+        Methods.LoadFromUrl = function (Name, Url, Type)
+        {
+            if (!Utility.FindByName(Name, this._Resources))  // check if script is not already there!
+            {
+                var me = this;
+                var resource = new Resource(Name, false);
+                this._Resources.push(resource);
+                var s = null;
+
+                switch (Type)
+                {
+                    case "Script":
+
+                        s = document.createElement("script");
+                        s.type = "text/javascript";
+                        break;
+
+                    case "Style":
+
+                        s = document.createElement("link");
+                        s.rel = "stylesheet";
+                        s.type = "text/css";
+                        break;
+
+                    default:
+
+                        throw "LoadFromUrl : invalid type '" + type + "'!";
+                        break;
+                }
+
+                s.onload = s.onreadystatechange = function ()
+                {
+                    if ((!this.readyState || this.readyState === "loaded" || this.readyState === "complete"))
+                    {
+                        // Completed!
+                        // on met loaded pour ce script et on execute
+                        // les fonctions callback si lieu.
+                        if (!resource._Loaded)
+                        {
+                            resource._Loaded = true;
+
+                            // loop throw all callbacks and remove ref resource (waitingfor)
+                            for (var i = 0; i <= me._CallBack.length - 1; i++)
+                            {
+                                if (me._CallBack[i]._WaitingFor.contains(resource._Name)) me._CallBack[i]._WaitingFor.remove(resource._Name);
+                            }
+                        }
+                    }
+                };
+
+                // Append Script, Style to header
+                if (Type == "Script") s.src = Url;
+                else s.href = Url;
+                $('head')[0].appendChild(s);
+            }
+        };
+
+        Methods.Load = function (Script, elements, data)
+        {
+            // append script to header!
+            if (Script.startsWith("<script") && Script.endsWith("</script>")) throw "Load : remove scripttag from your script";
+            eval(Script);
+        };
+
+        Methods.RegisterCallBack = function (Name, Handler, Context)
+        {
+            var Names = [];
+            try
+            {
+                Names = $.parseJSON(Name);
+            }
+            catch (ex) { Names = [Name] }
+
+            var WaitingFor = [];
+            var NbLoaded = 0;
+            for (var i = 0; i <= Names.length - 1; i++)
+            {
+                WaitingFor.push(Names[i]);
+                var resource = Utility.FindByName(Names[i], this._Resources);
+                if (resource && resource._Loaded) NbLoaded += 1;
+            }
+            if (NbLoaded === Names.length) WaitingFor = [];
+
+            // push new callback and waitingfor list.
+            var callback = new Callback(Handler, Context, WaitingFor);
+            this._CallBack.push(callback);
+
+            var CallBackParam = this._CallBack;
+            var RessourceParam = this._Resources;
+
+            // start the worker
+            if (!WorkerWorking)
+            {
+                WorkerWorking = true;
+                WorkerInterval = window.setInterval(
+                    function () {
+                        WorkerCallBack(CallBackParam, RessourceParam);
+                }, 100);
+            }
+        };
+
+    })(Class.prototype);
+
+
+    return new Class();
+})();

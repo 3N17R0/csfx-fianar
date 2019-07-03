@@ -1,0 +1,264 @@
+﻿WS.Namespace.Create('NovAxis.VirtualCollection', (function () {
+    var PIXEL = "px";
+    var PERCENT = "%";
+
+    // Constructor
+    var _class = function (htmlElement, options) {
+        if (!htmlElement)
+            throw _error('First argument type must be HTMLElement');
+        if (typeof options !== 'object')
+            throw _error('Options argument is missing or invalid. Received ' + props);
+        if (typeof options.cellRenderer !== 'function')
+            throw _error('Option "cellRenderer" must be a function.');
+
+        this._scrollUpdateDeltaTime = 10;
+        this._lastUpdateTime = 0;
+        this._renderedCellCache = [];
+        this._renderedEmptyCell = null;
+        this._layout = {
+            cellHeight: 0,
+            cellWidth: 0,
+            width: 0,
+            height: 0,
+            cellWidthPercent: 0
+        };
+
+        this.container = $(htmlElement);
+        this.scrollable = $('<div class="scrollable"></div>');
+        this.options = {
+            cellRenderer: null,
+            noCellRenderer: null,
+            cellCount: 0,
+            useCache: true,
+            scrollablePadding: 0,
+            rowOverload: 1
+        };
+
+        Init.call(this, options);
+    };
+
+    // Private methods
+
+    var Init = function (options) {
+        var me = this;
+
+        var container = this.container;
+
+        container.append(this.scrollable);
+        container.on('scroll', OnContainerScroll.bind(this));
+
+        timeout = false;
+        delay = 300;
+        $(window).on("resize orientationchange", function () {
+            clearTimeout(timeout);
+            timeout = setTimeout(OnWindowResize.bind(me), delay);
+        });
+
+        this.UpdateOptions(options);
+    };
+
+    /**
+     * Renders a specified cell index using the current visible row and column index.
+     */
+    var RenderCell = function (index, rowIndex, colIndex, noCache) {
+        var opt = this.options;
+        var style = GetCellPositionStyle.call(this, index, rowIndex, colIndex);
+
+        if (index < 0) {
+            cell = CreateCell(index, style, opt.noCellRenderer);
+            this._renderedEmptyCell = cell;
+            return cell;
+        } else {
+            var cell = noCache ? null : this._renderedCellCache[index];
+            if (!cell) {
+                cell = CreateCell(index, style, opt.cellRenderer);
+                if (!noCache) {
+                    this._renderedCellCache[index] = cell;
+                }
+            }
+            return cell;
+        }
+    };
+
+    var GetCellPositionStyle = function (index, rowIndex, colIndex) {
+        var layout = this._layout;
+        var cellWidthPercent = layout.cellWidthPercent;
+        var cellHeight = layout.cellHeight;
+        return {
+            position: 'absolute',
+            top: (rowIndex * cellHeight) + PIXEL,
+            left: (colIndex * cellWidthPercent) + PERCENT
+        };
+    };
+
+    /**
+     * Creates a new cell element with required style.
+     */
+    var CreateCell = function (index, style, cellRenderer) {
+        var cell = $('<div></div>');
+        UpdateStyle(cell, style);
+        return cellRenderer(index, cell, style);
+    };
+
+    /**
+     * Removes all "out-of-range" elements from DOM.
+     */
+    var DetachElements = function (indexStart, indexEnd) {
+        var scrollable = this.scrollable;
+        var cells = this._renderedCellCache;
+        var length = cells.length;
+        for (var i = 0; i < length; i++) {
+            if (i < indexStart || i > indexEnd) {
+                var element = cells[i];
+                if (element) {
+                    element.detach();
+                    if (!this.options.useCache) {
+                        this._renderedCellCache[i] = void 0;
+                    }
+                }
+            }
+        }
+    };
+
+    var GetScrollableHeight = function () {
+        var layout = this._layout;
+        return layout.cellHeight * Math.ceil(this.options.cellCount / Math.floor(layout.width / layout.cellWidth));
+    }
+
+    var UpdateStyle = function (element, newStyle) {
+        element.css(newStyle);
+    };
+
+    var OnContainerScroll = function (event) {
+        var time = event.timeStamp;
+        if ((time - this._lastUpdateTime) > this._scrollUpdateDeltaTime) {
+            this.Render();
+        }
+    };
+
+    var OnWindowResize = function (event) {
+        this.Layout();
+    };
+
+    var _error = function (message) {
+        return new Error('VirtualCollection: ' + message);
+    };
+
+    var _assign = function (target, source) {
+        for (var key in source) {
+            target[key] = source[key];
+        }
+    };
+
+    // Public methods
+
+    (function (methods) {
+
+        methods.Layout = function () {
+            var container = this.container;
+            var ghostCell = this.options.cellCount > 0 ? RenderCell.call(this, 0, 0, 0, true) : $('<div></div>');
+            var layout = this._layout;
+
+            ghostCell.css('visibility', 'hidden');
+
+            this.ClearCache();
+            this.scrollable.append(ghostCell);
+
+            var width = this.scrollable.innerWidth()
+            var cellWidth = ghostCell.innerWidth();
+
+            _assign(layout, {
+                width: width,
+                height: container.innerHeight(),
+                cellWidth: cellWidth,
+                cellHeight: ghostCell.innerHeight(),
+                cellWidthPercent: cellWidth * 100 / width
+            });
+
+            var scrollHeight = GetScrollableHeight.call(this);
+
+            UpdateStyle(this.scrollable, {
+                position: 'relative',
+                overflow: 'hidden',
+                width: '100%',
+                height: scrollHeight + PIXEL
+            });
+
+            container.scrollTop(Math.min(container.scrollTop(), scrollHeight - layout.height));
+
+            ghostCell.detach();
+
+            this.Render();
+
+            return this;
+        };
+
+        methods.Render = function () {
+            var opt = this.options;
+            var layout = this._layout;
+            var scrollable = this.scrollable;
+            var rowIndexStart = Math.floor(this.GetScrollTop() / layout.cellHeight);
+            var rowIndexEnd = rowIndexStart + (layout.height / layout.cellHeight) + opt.rowOverload;
+            var columnCount = Math.floor(layout.width / layout.cellWidth);
+            var columnIndexStart = Math.floor(this.GetScrollLeft() / layout.cellWidth);
+            var columnIndexEnd = columnIndexStart + columnCount;
+            var index = rowIndexStart * columnCount;
+
+            var renderedCellCount = Math.min(opt.cellCount, (rowIndexEnd - rowIndexStart) * (columnIndexEnd - columnIndexStart));
+
+            if (renderedCellCount < 1 && typeof opt.noCellRenderer === 'function') {
+                scrollable.empty();
+                scrollable.append(RenderCell.call(this, -1, 0, 0));
+                scrollable.css({ height: 'auto' });
+                return;
+            }
+
+            DetachElements.call(this, index, index + renderedCellCount - 1);
+            scrollable.css({ height: GetScrollableHeight.call(this) + PIXEL });
+
+            for (var i = rowIndexStart; i < rowIndexEnd; i++) {
+                for (var j = columnIndexStart; j < columnIndexEnd; j++) {
+                    if (index < opt.cellCount) {
+                        scrollable.append(RenderCell.call(this, index, i, j));
+                    }
+                    index++;
+                }
+            }
+            return this;
+        };
+
+        methods.UpdateOptions = function (options) {
+            if (options) {
+                _assign(this.options, options);
+            }
+            this.Layout();
+        };
+
+        methods.ClearCache = function () {
+            var length = this._renderedCellCache.length;
+            var cache = this._renderedCellCache;
+            var scrollable = this.scrollable;
+            for (var i = 0; i < length; i++) {
+                var element = cache[i];
+                if (element) element.detach();
+            }
+            if (this._renderedEmptyCell) this._renderedEmptyCell.detach();
+            this._renderedCellCache = [];
+        };
+
+        methods.ScrollTo = function (scrollTop) {
+            this.container.scrollTop(scrollTop);
+        };
+
+        methods.GetScrollTop = function () {
+            return this.container.scrollTop();
+        };
+
+        methods.GetScrollLeft = function () {
+            return this.container.scrollLeft();
+        };
+
+    })(_class.prototype);
+
+    return _class;
+})());

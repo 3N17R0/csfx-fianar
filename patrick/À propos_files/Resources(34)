@@ -1,0 +1,71 @@
+﻿.wsCtSocialButtons
+{
+    position: absolute;
+    min-width: 100%;
+    line-height: 0;
+    white-space: nowrap;
+}
+
+.wsCtSocialButtons .wsCtBadge
+{
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+
+.wsCtSocialButtons.wsCtBadgeCenter .wsCtBadge
+{
+    margin: 0 auto;
+}
+
+.wsCtSocialButtons.wsCtBadgeRight .wsCtBadge
+{
+    margin-left: auto;
+    margin-right: 0;
+}
+
+.wsCtSocialButtons .wsCtBadge:last-child
+{
+    margin-bottom: 0 !important;
+}
+
+.wsCtSocialButtons:not(.wsCtBadgeLeft):not(.wsCtBadgeCenter) .wsCtBadge:last-child
+{
+    margin-right: 0 !important;
+}
+
+.wsCtSocialButtons .wsCtBadge a
+{
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.wsCtSocialButtons.wsCtBadgeColorSquare .wsCtBadge
+{
+    background-image: url(/file/app/1/content/socialbuttons/icons/colorsquare.png);
+}
+
+.wsCtSocialButtons.wsCtBadgeColorRound .wsCtBadge
+{
+    background-image: url(/file/app/1/content/socialbuttons/icons/colorround.png);
+}
+
+.wsCtSocialButtons.wsCtBadgeBlackSquare .wsCtBadge
+{
+    background-image: url(/file/app/1/content/socialbuttons/icons/blacksquare.png);
+}
+
+.wsCtSocialButtons.wsCtBadgeBlackRound .wsCtBadge
+{
+    background-image: url(/file/app/1/content/socialbuttons/icons/blackround.png);
+}
+
+.wsCtSocialButtons.wsCtBadgeWhiteSquare .wsCtBadge
+{
+    background-image: url(/file/app/1/content/socialbuttons/icons/whitesquare.png);
+}
+
+.wsCtSocialButtons.wsCtBadgeWhiteRound .wsCtBadge
+{
+    background-image: url(/file/app/1/content/socialbuttons/icons/whiteround.png);
+}

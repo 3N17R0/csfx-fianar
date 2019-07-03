@@ -1,0 +1,50 @@
+﻿
+.naNumeric
+{
+    border: 2px solid transparent;
+    background-color: [neutral-2-background-color];
+    color: [neutral-2-text-color];
+    font-family: 'Signika', sans-serif;
+    font-size: 11pt;
+    padding: 1px;
+    margin: 0;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    border-radius: 3px;
+}
+
+.naNumeric:focus
+{
+    box-shadow: 0 0 0 2px [main-1-background-color];
+}
+
+.naNumericWrapper{
+    position:relative;
+}
+
+.naNumericWrapper .naNumeric{
+    width:100%;
+}
+
+.naNumericWrapper > span{
+    background-image: url(/file/app/1/editor/icon/decrease.svg?color1=r19g173b183);
+    background-size:11px 6px;
+    background-repeat:no-repeat;
+    background-position:0px 2px;
+    display: block;
+    width: 11px;
+    height: 50%;
+    position: absolute;
+    cursor:pointer;
+    right: 8px;
+}
+
+.naNumericWrapper > span[name=Up]{
+    top: 0;
+    transform: rotate(180deg);
+}
+
+.naNumericWrapper > span[name=Down]{
+    top:50%;
+}

@@ -1,0 +1,153 @@
+﻿/**
+Represents one content.
+**/
+var Content = (function ()
+{
+    /**
+    Content.
+    @class Content
+    @constructor
+    @param {jQuery dom} element Dom element that represents a content wrapper.
+    **/
+    var _class = function (element)
+    {
+        // EVENT (DOM READY FOR PUSHING ENGINE)
+        WS.EventObject.call(this, ["dom_ready"]);
+
+        this.ContentType = element.attr("class").match(/Type_([^\s]*)/i)[1];
+        this.Element = element;
+        this.InBodyWrapper = element.closest("#BodyWrapper").length == 1;
+
+        if (window.WS.IsMobile && this.ContentType === "Image")
+        {
+            this.InitialSize = {};
+            this.InitialSize.Width = element.width();
+            this.InitialSize.Height = element.height();
+        }
+
+        if (window.WS.IsMobile && this.ContentType.toLowerCase() === "slideshow")
+        {
+            element.addClass("wsMobile");
+        }
+
+        var isScalableTextType = this.ContentType === "Text" || this.ContentType === "Title" || this.ContentType === "Button";
+        var Me = this;
+
+        var OnContentLoaded = function () {
+            if (Me.ContentType === "Button") {
+                this.Update();
+
+                // "Arrow" buttons text cannot be multiplied.
+                isScalableTextType = !IsSvgButton.call(Me.Element);
+                if (isScalableTextType) {
+                    Me.Element.addClass('ScalableButton');
+                    if (window.WS.IsMobile) window.setTimeout(function () { Me.RaiseEvent("dom_ready", Me.Element); }, 5000);
+                }
+            }
+
+            // For scalable types, we must set the font size of each child element.
+            if (isScalableTextType) {
+                ApplyMultiplier.call(Me, element, parseFloat(element.attr('multiplier').replace(',', '.')));
+            }
+        };
+
+        this.ContentLoader = new ContentLoader(element, null, window.WS.IsMobile ? OnContentLoaded : null);
+    };
+
+    WS.Exts.Inherits(_class, WS.EventObject);
+
+    // Public Method(s)
+    (function (Methods)
+    {
+        /**
+        Resizes the content to better fit the available space.
+
+        @method Resize
+        **/
+        Methods.Resize = function ()
+        {
+            if (this.ContentType === "Image")
+            {
+                AdjustImageSize.call(this, this.Element);
+                this.ContentLoader.Update();
+            }
+        };
+
+        Methods.InBody = function ()
+        {
+            return this.InBodyWrapper;
+        };
+
+    })(_class.prototype);
+
+    // Private methods
+
+    /**
+    Checks if the button is an ssvg child.
+
+    @method IsSvgButton
+    **/
+    var IsSvgButton = function ()
+    {
+        return this.find('svg').length > 0;
+    }
+
+    /**
+    Apply the font multiplier on each text element of the current element.
+    
+    @method ApplyMultiplier
+    **/
+    var ApplyMultiplier = function (element, Multiplier)
+    {
+        var elements = element.find(".Block_Wrapper > :first *"); // all elements within the wrapper
+        var elementsLen = elements.length;
+        for (var i = elementsLen; i > 0; i--)
+        {
+            var e = elements.eq(i - 1);
+            e.css("font-size", GetMultipliedFontSize(e, Multiplier));
+        }
+
+        this.ContentLoader.Update();
+    };
+
+    /**
+    Gets a font size resulting from a multiplier and the default font size of an element.
+    **/
+    var GetMultipliedFontSize = function (element, Multiplier)
+    {
+        var defaultFontSize = element.css('font-size').replace('px', '');
+        return defaultFontSize * Multiplier + "px";
+    };
+
+    /**
+    Adjusts the size of an image to either fit horizontally, or be centered.
+    
+    @method AdjustImageSize
+    @param {Content} content Content which type is Image.
+    **/
+    var AdjustImageSize = function (content)
+    {
+        var availableWidth = $("#BodyWrapper .Zone").width();
+
+        // If the image is larger than the available width: make it fit.
+        if (this.InitialSize.Width > availableWidth)
+        {
+            var width = this.InitialSize.Width;
+            var height = this.InitialSize.Height;
+            var ratio = availableWidth / width;
+
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+
+            content.css('width', width + "px");
+            content.css('height', height + "px");
+        }
+        else
+        {
+            // Image is smaller than the available width: we center it
+            content.css('margin-left', (availableWidth - this.InitialSize.Width) / 2);
+        }
+    };
+
+    return _class;
+})();

@@ -1,0 +1,13 @@
+﻿WS.Namespace.Create('WS.Content.Map', (function ()
+{
+    var Class = function (control, element, data)
+    {       
+        if (!control) throw "control is null";
+        if (!element || element.length == 0) throw "element is null";
+        if (!data) throw "data is null";
+
+        if (control.onLoaded) control.onLoaded(this);
+    };
+
+    return Class;
+})());

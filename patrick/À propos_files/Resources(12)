@@ -1,0 +1,247 @@
+﻿
+/**
+@class AjaxManager 
+@static
+**/
+var AjaxManager = (function ()
+{
+    // Constructor
+    var Class = function ()
+    {
+        this.Key = "";
+    };
+
+    // Public Methods
+    (function (Methods)
+    {
+        /**
+        @method Post
+        @static
+        @param {String} Url
+        @param {Object} [Data]
+        @param {Function} [Callback_Success]
+        @param {Function} [Callback_Error]
+        @param {Object} [Context] default value = window.
+        **/
+        Methods.Post = function (Url, Data, CallBack_Success, CallBack_Error, Context, Async)
+        {
+            Async = Async === false ? false : true;
+            AjaxCall.call(this, Url, "POST", Data, CallBack_Success, CallBack_Error, Context, Async);
+        };
+
+        /**
+        @method Get
+        @static
+        @param {String} Url
+        @param {Object} [Data]
+        @param {Function} [Callback_Success]
+        @param {Function} [Callback_Error]
+        @param {Object} [Context] default value = window.
+        **/
+        Methods.Get = function (Url, Data, CallBack_Success, CallBack_Error, Context, Async)
+        {
+            Async = Async === false ? false : true;
+            AjaxCall.call(this, Url, "GET", Data, CallBack_Success, CallBack_Error, Context, Async);
+        };
+
+        /**
+        @method SetKey
+        @static
+        @param {String} Key
+        **/
+        Methods.SetKey = function (Key)
+        {
+            this.Key = Key;
+        };
+
+    })(Class.prototype);
+
+    // Html action handlers
+    var HtmlActionHandlers = {
+
+        Create: function (Data)
+        {
+            if (!Data.Value) throw "Data value cannot be null.";
+
+            return $(Data.Value);
+        },
+
+        Add: function (Data)
+        {
+            if (!Data.Value) throw "must have content";
+            if (!Data.Selector) throw "must have Selector";
+            if (!Data.Position) throw "must have Position";
+
+            var el = $(Data.Value);
+            var Pos = Data.Position.toLowerCase();
+            if (Pos === "after") $(Data.Selector).after(el);
+            else if (Pos === "before") $(Data.Selector).before(el);
+            else if (Pos === "inside") $(Data.Selector).append(el);
+
+            return el;
+        },
+
+        "Delete": function (Data)
+        {
+            if (!Data.Selector) throw "must have Selector";
+            $(Data.Selector).remove();
+        },
+
+        Update: function (Data)
+        {
+            if (!Data.Value) throw "must have content";
+            if (!Data.Selector) throw "must have Selector";
+
+            var el = $(Data.Value);
+            $(Data.Selector).html(el);
+
+            return el;
+        },
+
+        Replace: function (Data)
+        {
+            if (!Data.Value) throw "must have content";
+            if (!Data.Selector) throw "must have Selector";
+
+            var el = $(Data.Value);
+            $(Data.Selector).replaceWith(el);
+
+            return el;
+        }
+    };
+
+    // Manager and Callers
+    var HtmlManager = function (Data, Elements)
+    {
+        if (!Data) throw "data must exist!";
+        if (!Data.Action) throw "must have an Action";
+
+        var handler = HtmlActionHandlers[Data.Action];
+        if (!handler) throw "Invalid Action type : '" + Data.Action + "'.";
+        var el = handler(Data);
+        if (el) Elements.push(el);
+    };
+
+    var ResourceManagerCall = function (Data, Elements, DataObj, Context)
+    {
+        if (!Data.Value) throw "ResourceManagerCall : value must exist!";
+        if (Data.IsUrl && !Data.IsRegisterCallBack) { ResourceManager.LoadFromUrl(Data.Name, Data.Value, Data.Type); }
+        else if (Data.IsRegisterCallBack)
+        {
+            if (Data.IsUrl) ResourceManager.RegisterCallBack(Data.Dependencies, function () { ResourceManager.LoadFromUrl(Data.Name, Data.Value, Data.Type); }, Context);
+            else ResourceManager.RegisterCallBack(Data.Name, function () { ResourceManager.Load.call(this, Data.Value, Elements, DataObj); }, Context);
+        }
+        else
+        {
+            ResourceManager.Load.call(Context, Data.Value, Elements, DataObj);
+        }
+    };
+
+    var DataManager = function (Data)
+    {
+        return (Data.Value ? Data.Value : null);
+    };
+
+    // Ajax data handlers
+    var AjaxDataHandlers = {
+
+        Html: function (Data, Elements)
+        {
+            HtmlManager(Data, Elements)
+        },
+
+        Script: function (Data, Elements, DataObj, Context)
+        {
+            ResourceManagerCall(Data, Elements, DataObj, Context)
+        },
+
+        Style: function (Data)
+        {
+            ResourceManagerCall(Data)
+        },
+
+        Data: function (Data)
+        {
+            return DataManager(Data)
+        }
+    };
+
+    var dataSortOrder = ["Html", "Data", "Style", "Script"];
+    var dataSortFunction = function (a, b)
+    {
+        return dataSortOrder.indexOf(a.Type) - dataSortOrder.indexOf(b.Type);
+    };
+
+    // Ajax Get,Post Request
+    var AjaxCall = function (Url, Type, Data, CallBack_Success, CallBack_Error, Context, Async)
+    {
+        var Me = this;
+        if (!Url) throw "url is necessary!";
+
+        if (Data)
+        {
+            if (typeof Data != "object") throw "Data must be a valid javascript object.";
+            if (Type === "POST") Data = JSON.stringify(Data);
+        }
+        Context = Context || window;
+        Async = Async === false ? false : true;
+
+        // Request
+        $.ajax({
+
+            url: Url,           // Url handler
+            data: Data,         // Data à envoyer au serveur, JSON pour POST, QueryString pour GET
+            type: Type,         // POST, GET
+            contentType: (Type === "POST" ? "application/json; charset=UTF-8" : "application/x-www-form-urlencoded; charset=UTF-8"), // format des données envoyées au serveur
+            headers: { 'x-key': Me.Key },
+            dataType: "json",    // format de retour du server : json utilisé (xml, json, script, or html)
+            async: Async
+
+        }).done(function (Data, TextStatus, jqXHR)
+        {
+            // Redirection
+            if (jqXHR.getResponseHeader("isRedir") && jqXHR.getResponseHeader("isRedir") == "1")
+            {
+                var str = Data[0].Value.split('|');
+                if (str[0] == "top") top.location.href = str[1];
+                else window.location.href = str[0];
+
+                return;
+            } 
+
+            Data.sort(dataSortFunction);
+            var Elements = [];
+            var HtmlDependencies = [];
+            var DataObj = null;
+            var dataTypeReturnCount = 0;
+
+            for (var i = 0; i < Data.length; i++) { if (Data[i].Type == "Html" && Data[i].Dependencies) HtmlDependencies[HtmlDependencies.length] = Data[i].Dependencies; }
+            for (var i = 0; i < Data.length; i++) { if (Data[i].Type == "Data") dataTypeReturnCount++; }
+            if (dataTypeReturnCount > 1) throw "Cannot have more than one data object in response!";
+
+            for (var i = 0; i < Data.length; i++)
+            {
+                var handler = AjaxDataHandlers[Data[i].Type];
+                if (!handler) throw "Invalid data Type : '" + Data[i].Type + "'.";
+                var obj = handler(Data[i], Elements, DataObj, Context);
+                if (Data[i].Type == "Data") DataObj = obj;
+            }
+
+            if (HtmlDependencies.length > 0)
+            {
+                ResourceManager.RegisterCallBack(HtmlDependencies, function () { if (CallBack_Success && (typeof CallBack_Success == "function")) CallBack_Success.call(Context, DataObj, Elements); }, Context);
+            }
+            else
+            {
+                if (CallBack_Success && (typeof CallBack_Success == "function")) CallBack_Success.call(Context, DataObj, Elements);
+            }
+
+        }).fail(function (jqXHR, textStatus, errorThrown)
+        {
+            if (CallBack_Error && (typeof CallBack_Error == "function")) CallBack_Error.call(Context, jqXHR.responseText);
+        });
+    };
+
+
+    return new Class();
+})();

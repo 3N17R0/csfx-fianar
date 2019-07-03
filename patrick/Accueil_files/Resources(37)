@@ -1,0 +1,176 @@
+
+WS.Namespace.Create('WS.Content.ButtonUI', (function ()
+{
+    // Constructor
+    var _class = function (control, element, data)
+    {
+        // Validation
+        if (!element || element.length == 0) throw "element is null";
+        if (!control) throw "control is null";
+        if (!data) throw "data is null";
+
+        this.element = element;
+        this.data = data;
+        this.newImg = null;
+        this.ImgIsLoaded = false;
+
+        // For Editor Implement
+        if (control.onLoaded) control.onLoaded(this);
+    };
+
+    // Private Method(s)
+    var BindSVGbackground = function (width, height)
+    {
+        var Me = this;
+
+        var Content = this.element.find(".wsCtButtonMain");
+        var PointShape = 0;
+        var BodyWidth = width;
+        var BodyHeight = height;
+        var Decalage = parseInt(BodyHeight / 2);
+        this.points = null;
+
+        // Text Align
+        var Text = Content.find(".wsText");
+
+        // Svg Points, Text Align Supp.
+        if (this.data.Shape == "ArrowLeft")
+        {
+            Text.css("padding-left", Decalage + "px");
+            this.points = PointShape + "," + Decalage + " " + Decalage + "," + PointShape + " " + BodyWidth + "," + PointShape + " " + BodyWidth + "," + BodyHeight + " " + Decalage + "," + BodyHeight;
+        }
+        else
+        {
+            Text.css("padding-right", Decalage + "px");
+            this.points = PointShape + "," + PointShape + " " + (BodyWidth - Decalage) + "," + PointShape + " " + BodyWidth + "," + Decalage + " " + (BodyWidth - Decalage) + "," + BodyHeight + " " + PointShape + "," + BodyHeight;
+        }
+
+        // Image Background
+        if (this.data.HasBackground && this.data.Background.Type == "Image")
+        {
+            this.BodyWidth = BodyWidth;
+            this.BodyHeight = BodyHeight;
+            if (!this.newImg) BindImg.call(this);
+            if (this.ImgIsLoaded) SetImageButton.call(this);
+            this.newImg.onload = function ()
+            {
+                if (Me.ImgIsLoaded == false) SetImageButton.call(Me);
+                Me.ImgIsLoaded = true;
+            };
+        }
+        else
+        {
+            // Colors Only
+            Content.find("svg").remove();
+            Content.append(GetSvg.call(this, null, width, height));
+        }
+    };
+
+    var GetSvg = function (Image, width, height)
+    {
+        var timestamp = (new Date()).getTime();
+        var Svg = '<svg width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" style="overflow: visible;">';
+        Svg += '<defs>';
+
+        // Border clipping
+        Svg += '<clipPath id="clip' + timestamp + '">';
+        Svg += '<polygon points="' + this.points + '" />';
+        Svg += '</clipPath>';
+
+        // Background image pattern
+        if (Image)
+        {
+            var x = (width - Image.newWidth) / 2;
+            var y = (height - Image.newHeight) / 2;
+            Svg += '<pattern id="background' + timestamp + '" width="' + width + '" height="' + height + '" patternUnits="userSpaceOnUse">'
+            Svg += '<image xlink:href="' + this.data.Background.Url + '" x="' + x + '" y="' + y + '" width="' + Image.newWidth + '" height="' + Image.newHeight + '"></image>';
+            Svg += '</pattern>';
+        }
+
+        // Shadow filter
+        Svg += '<filter id="shadow' + timestamp + '" x="-100%" y="-100%" '+ (this.data.HasShadow ? 'width="400%"' : 'width="0"') + 'height="400%">';
+        Svg += '<feGaussianBlur in="SourceGraphic" stdDeviation="' + this.data.Shadow.Blur + '" result="temp" />';
+        Svg += '<feOffset in="temp" dx="' + this.data.Shadow.OffsetX + '" dy="' + this.data.Shadow.OffsetY + '" result="temp" />';
+        Svg += '<feImage xlink:href="#shape' + timestamp + '" x="0" y="0" width="' + width + '" height="' + height + '" result="shape" />';
+        Svg += '<feComposite in="temp" in2="shape" operator="out" />';
+        Svg += '</filter>';
+
+        Svg += '<linearGradient id="gradient' + timestamp + '" x1="' + (this.data.Background.Color.Angle == 270 ? "100" : "0") + '%" y1="' + (this.data.Background.Color.Angle == 0 ? "100" : "0") + '%" x2="' + (this.data.Background.Color.Angle == 90 ? "100" : "0") + '%" y2="' + (this.data.Background.Color.Angle == 180 ? "100" : "0") + '%">';
+        Svg += '<stop offset="0%" style="stop-color: ' + this.data.Background.Color.Colors[0].Value + '; stop-opacity: ' + this.data.Background.Color.Colors[0].Opacity + ';" />';
+        if (this.data.Background.Color.Colors.length > 1) Svg += '<stop offset="50%" style="stop-color: ' + this.data.Background.Color.Colors[1].Value + '; stop-opacity: ' + this.data.Background.Color.Colors[1].Opacity + ';" />';
+        if (this.data.Background.Color.Colors.length > 2) Svg += '<stop offset="100%" style="stop-color: ' + this.data.Background.Color.Colors[2].Value + '; stop-opacity: ' + this.data.Background.Color.Colors[2].Opacity + ';" />';
+        Svg += '</linearGradient>';
+
+        Svg += '</defs>';
+
+        // Shadow element
+        Svg += '<polygon points="' + this.points + '" style="' + (this.data.HasShadow ? '' : 'visibility: hidden; ') + 'fill: ' + WS.Util.Color.HexaToRgba(this.data.Shadow.Color) + '; stroke-linejoin: miter; filter: url(#shadow' + timestamp + ');" />';
+
+
+        // Background element
+        var fill = "transparent";
+        if (this.data.HasBackground) fill = this.data.Background.Type == "Color" ? "url(#gradient" + timestamp + ")" : "url(#background" + timestamp + ")";
+        Svg += '<polygon id="shape' + timestamp + '" points="' + this.points + '" style="' + (this.data.HasBackground ? '' : 'visibility: hidden; ') + 'stroke-linejoin: miter; fill: ' + fill + ';" />';
+
+        // Border element
+        var DashArray = null;
+        if (this.data.Border.Style != "Solid") DashArray = this.data.Border.Style == "Dotted" ? this.data.Border.Width + "," + this.data.Border.Width : (this.data.Border.Width * 2) + "," + (this.data.Border.Width * 2);
+        Svg += '<polygon points="' + this.points + '" style="' + (this.data.HasBorder ? '' : 'visibility: hidden; ') + 'stroke-linejoin: miter; fill: transparent; stroke: ' + WS.Util.Color.HexaToRgba(this.data.Border.Color) + '; stroke-width: ' + (this.data.Border.Width * 2) + ';' + (DashArray ? ' stroke-dasharray: ' + DashArray + ';' : '') + '" clip-path="url(#clip' + timestamp + ')" />';
+
+        Svg += '</svg>';
+
+        return Svg;
+    };
+
+    var SetImageButton = function ()
+    {
+        var Me = this;
+
+        var BodyWidth = Me.BodyWidth;
+        var BodyHeight = Me.BodyHeight;
+        var newWidth = Me.newWidth;
+        var newHeigh = Me.newHeight;
+
+        if (parseFloat(Me.BodyWidth / Me.newImg.width) == parseFloat(BodyHeight / Me.newImg.height))
+        {
+            newWidth = BodyWidth;
+            newHeight = BodyHeight;
+        }
+        else if (parseFloat(BodyWidth / Me.newImg.width) > parseFloat(BodyHeight / Me.newImg.height))
+        {
+            newWidth = BodyWidth;
+            newHeight = parseInt(Me.newImg.height * BodyWidth / Me.newImg.width);
+        }
+        else
+        {
+            newWidth = parseInt(Me.newImg.width * BodyHeight / Me.newImg.height);;
+            newHeight = BodyHeight;
+        }
+
+        var Content = this.element.find(".wsCtButtonMain");
+        Content.find("svg").remove();
+        Content.append(GetSvg.call(Me, { newWidth: newWidth, newHeight: newHeight }, BodyWidth, BodyHeight));
+    };
+
+    var BindImg = function ()
+    {
+        this.newImg = new Image();
+        this.newImg.src = this.data.Background.Url;
+    };
+
+    // Public Method(s)
+    (function (methods)
+    {
+        methods.onResize = function (width, height)
+        {
+            if (this.data.Shape == "ArrowLeft" || this.data.Shape == "ArrowRight") BindSVGbackground.call(this, width, height);
+        };
+
+        methods.onResized = function (width, height)
+        {
+            if (this.data.Shape == "ArrowLeft" || this.data.Shape == "ArrowRight") BindSVGbackground.call(this, width, height);
+        };
+    })(_class.prototype);
+
+    return _class;
+})());

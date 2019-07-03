@@ -1,0 +1,31 @@
+﻿
+.wsCtTitle > h1, .wsCtTitle > h2
+{
+    text-overflow: ellipsis;
+}
+
+.wsCtTitle p, .wsCtTitle h1, .wsCtTitle h2
+{
+    margin: 0;
+    font-size: 1em;
+    font-weight: normal;
+}
+
+.wsCtTitle a
+{
+    font-weight: inherit !important;
+    font-family: inherit !important;
+    letter-spacing: inherit !important;
+    line-height: inherit !important;
+    font-size: inherit !important;
+}
+
+.Block.Type_Title.wsMobile
+{
+    height: auto !important;
+}
+
+.Block.Type_Title.wsMobile .Block_Wrapper
+{
+    position: initial;
+}
